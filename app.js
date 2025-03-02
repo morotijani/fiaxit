@@ -5,8 +5,25 @@ const contactRoutes = require('./api/routes/contacts')
 const todoRoutes = require('./api/routes/todos')
 const userRoutes = require('./api/routes/users')
 const morgan = require('morgan') // HTTP request logger middleware for node.js
+const bodyParser = require('body-parser')
 
 app.use(morgan('dev'));
+
+// any request pass through and handle urlencoded
+app.use(bodyParser.urlencoded({extended:false})) // allows us to do the id and get parameter
+app.use(bodyParser.json()) //
+
+// CORS error handling
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    // methods that are allow to make requests
+    if (req.method == 'OPTIONS') {
+        res.header('Access-Control-Allow-Methods', 'POST, PATCH, DELETE, GET')
+        return res.status(200).json({})
+    }
+    next();
+})
 
 // Routes
 app.use('/contacts', contactRoutes)
