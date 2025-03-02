@@ -4,10 +4,30 @@ const router = express.Router(); // middleware
 const contactRoutes = require('./api/routes/contacts')
 const todoRoutes = require('./api/routes/todos')
 const userRoutes = require('./api/routes/users')
+const morgan = require('morgan') // HTTP request logger middleware for node.js
+
+app.use(morgan('dev'));
 
 // Routes
 app.use('/contacts', contactRoutes)
 app.use('/todos', todoRoutes)
 app.use('/users', userRoutes)
+
+// Error handling
+app.use((req, res, next) => {
+    const error = new Error('Route not found.');
+    error.status = 404;
+    next(error)
+})
+
+// becuase is comming from next we have error first
+app.use((error, req, res, next) => {
+    res.status(error.status || 500); // or server erro
+    res.json({
+        error: {
+            message: error.message
+        }
+    })
+})
 
 module.exports = app;
