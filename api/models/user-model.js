@@ -1,4 +1,5 @@
 const { Sequelize, DataTypes } = require('sequelize');
+const bcrypt = require('bcrypt');
 const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST, 
     dialect: process.env.DB_DIALECT, 
@@ -9,6 +10,9 @@ const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.en
 })
 
 const User = mysql.define('User', {
+    user_id: {
+        type: DataTypes.STRING(100),
+    },
     fname: {
         type: DataTypes.STRING
     },
@@ -35,9 +39,24 @@ const User = mysql.define('User', {
     }
 }, {
     indexes: [
+        {fields: ['user_id']}, 
         {fields: ['email']}
     ]
 });
 
-User.sync()
+User.sync();
+
+// this hook, run before user create
+User.beforeCreate(async (user, options) => { // pass user object in this function
+    const hashed = await bcrypt.hash(user.password, 10); // create a has password from user.password
+    user.password = hashed;
+});
+
+User.beforeSave(async (user, options) => {
+    if (user.updatePassword) {
+        const hashed = await bcrypt.hash(user.password, 10)
+        user.password = hashed
+    }
+})
+
 module.exports = User;
