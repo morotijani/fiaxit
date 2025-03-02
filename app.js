@@ -1,20 +1,13 @@
 const express = require('express');
 const app = express();
 const router = express.Router(); // middleware
+const contactRoutes = require('./api/routes/contacts')
+const todoRoutes = require('./api/routes/todos')
+const userRoutes = require('./api/routes/users')
 
-// set up route and tell it what to do
-router.get('/', (req, res) => {
-    res.send('Hello World');
-});
-
-router.get('/about', (req, res) => {
-    res.send('About us');
-});
-
-router.get('/contact', (req, res) => {
-    res.send('Contact us');
-});
-
-app.use(router);
+// Routes
+app.use('/contacts', contactRoutes)
+app.use('/todos', todoRoutes)
+app.use('/users', userRoutes)
 
 module.exports = app;
