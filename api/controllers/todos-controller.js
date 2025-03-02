@@ -1,3 +1,5 @@
+const Todo = require('../models/todo-model');
+
 class TodosController {
     // get all method
     getAll = () => {

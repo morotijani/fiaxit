@@ -1,3 +1,5 @@
+const Contact = require('../models/contact-model')
+
 class ContactsController {
     // get all method
     getAll = () => {

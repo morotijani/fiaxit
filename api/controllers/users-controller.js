@@ -1,3 +1,5 @@
+const User = require('../models/user-model');
+
 class UsersController {
     signup = () => {
         return (req, res, next) => {
