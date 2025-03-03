@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const TodosController = require('../controllers/todos-controller');
+const userAuth = require("../middleware/check-auth");
 
 router.get('/', TodosController.getAll());
 

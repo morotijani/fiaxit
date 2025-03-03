@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ContactsController = require('../controllers/contacts-controller');
+const userAuth = require("../middleware/check-auth");
 
 router.get('/', ContactsController.getAll());
 
