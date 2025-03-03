@@ -10,7 +10,7 @@ const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.en
 
 const Contact = mysql.define('Contact', {
     user_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING(100),
         allowNull: true
     },
     fname: {

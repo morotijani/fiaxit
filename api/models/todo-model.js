@@ -11,7 +11,7 @@ const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.en
 const Todo = mysql.define('Todo', {
     // there is not need to add id, mysql will add id by default as a primary key
     user_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING(100),
         allowNull: true
     },
     name: {

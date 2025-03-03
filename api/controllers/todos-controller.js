@@ -4,7 +4,7 @@ class TodosController {
     // get all method
     getAll = () => {
         return async (req, res, next) => {
-            const userId = 1;
+            const userId = req.userData.user_id;
             const {count, rows} = await Todo.findAndCountAll({
                 where: {
                     user_id: userId
@@ -23,7 +23,7 @@ class TodosController {
             try {
                 const todo = await Todo.create({
                     name: req.body.name,
-                    user_id: 1,
+                    user_id: req.userData.user_id,
                     completed: req.body.completed
                 });
                 res.status(201).json({ // 201 (success) use for creating often a post and put request
@@ -39,7 +39,7 @@ class TodosController {
 
     findById = () => {
         return async (req, res, next) => {
-            const userId = 1;
+            const userId = req.userData.user_id;
             const todoId = req.params.id;
             const todo = await Todo.findOne({
                 where: {
@@ -59,7 +59,7 @@ class TodosController {
     update = () => {
         return async (req, res, next) => {
             const todoId = req.params.id;
-            const userId = 1;
+            const userId = req.userData.user_id;
             const resp = {success: false, msg: "Todo not found"}
             const todo = await Todo.findOne({
                 where: {
@@ -89,7 +89,7 @@ class TodosController {
     delete = () => {
         return async (req, res, next) => {
             const todoId = req.params.id;
-            const userId = 1;
+            const userId = req.userData.user_id;
             const todo = await Todo.findOne({
                 where: {
                     id: todoId, 
