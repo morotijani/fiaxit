@@ -87,7 +87,6 @@ class ContactsController {
                     }
                 })
                 if (contact) {
-                    // if any of the values are null it does not update it to null
                     const vals = {
                         fname: req.body.fname,
                         lname: req.body.lname,

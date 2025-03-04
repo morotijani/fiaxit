@@ -12,7 +12,7 @@ const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.en
 const User = mysql.define('User', {
     user_id: {
         type: DataTypes.STRING(100),
-        allowNull: true
+        allowNull: false
     },
     fname: {
         type: DataTypes.STRING
