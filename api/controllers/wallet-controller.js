@@ -1,16 +1,20 @@
-const Transaction = require("../models/transaction-model");
+const Wallet = require("../models/wallet-model");
 const { v4: uuidv4 } = require('uuid')
+// const { PrivateKey } = require('bitcore-lib')
+const bitcore = require('bitcore-lib');
+const { PrivateKey, Networks } = bitcore;
+const  Mnemonic = require('bitcore-mnemonic');
 
-class TransactionsController {
+class WalletsController {
 
     // get all method
     getAll = () => {
         return async (req, res, next) => {
             try {
                 const userId = req.userData.user_id;
-                const { count, rows } = await Transaction.findAndCountAll({
+                const { count, rows } = await Wallet.findAndCountAll({
                     where: {
-                        transaction_by: userId
+                        wallet_for: userId
                     },
                     order: [['createdAt', 'DESC']]
                 });
@@ -26,29 +30,29 @@ class TransactionsController {
         }
     }
 
-    // find by transaction id
+    // find by wallet id
     findById = () => {
         return async (req, res, next) => {
             const userId = req.userData.user_id;
-            const transactionId = req.params.id;
+            const walletId = req.params.id;
 
-            const transaction = await Transaction.findOne({
+            const wallet = await Wallet.findOne({
                 where: {
-                    transaction_id: transactionId, 
-                    transaction_by: userId
+                    wallet_id: walletId, 
+                    wallet_for: userId
                 }
             })
             const resp = {
                 success: false,
                 method: "findById", 
-                msg: "Transaction not found!", 
-                transaction: null
+                msg: "Wallet not found!", 
+                wallet: null
             }
-            if (transaction) {
+            if (wallet) {
                 resp.success = true;
                 resp.method = "findById";
-                resp.msg = "Transaction found!";
-                resp.transaction = transaction;
+                resp.msg = "Wallet found!";
+                resp.wallet = wallet;
             }
             res.status(200).json(resp)
         }
@@ -58,43 +62,58 @@ class TransactionsController {
     create = () => {
         return async (req, res, next) => {
             try {
-                // validate required fields
-                const requiredFields = ['transaction_amount', 'transaction_crypto_id', 'transaction_to_wallet_address'];
-                for (const field of requiredFields) {
-                    if (!req.body[field]) {
-                        return res.status(400).json({
-                            success: false, 
-                            error: `Missing required field: ${field}`
-                        });
-                    }
-                }
-
+                const crypto = req.params.id;
                 const userId = req.userData.user_id;
-                const transactionId = uuidv4();
-                const transactionStatus = 1;
-                const transaction = await Transaction.create({
-                    transaction_id: transactionId, 
-                    transaction_by: userId, 
-                    transaction_amount: req.body.transaction_amount, 
-                    transaction_crypto_id: req.body.transaction_crypto_id, 
-                    transaction_crypto_symbol: req.body.transaction_crypto_symbol, 
-                    transaction_crypto_name: req.body.transaction_crypto_name, 
-                    transaction_crypto_price: req.body.transaction_crypto_price, 
-                    transaction_to_wallet_address: req.body.transaction_to_wallet_address, 
-                    transaction_message: req.body.transaction_message || null, 
-                    transaction_status: transactionStatus
+                const walletId = uuidv4();
+                const walletBalance = '0.00';
+                
+                // Default empty wallet data
+                let walletXpub = null;
+                let walletAddress = null;
+                let encryptedData = null; // For storing encrypted sensitive data if needed
+                
+                if (crypto === 'BTC') {
+                    // Use testnet for development, mainnet for production
+                    const network = process.env.NODE_ENV === 'production' ? Networks.mainnet : Networks.testnet;
+                    
+                    // Create a single HD wallet
+                    const passPhrase = new Mnemonic(Mnemonic.Words.SPANISH);
+                    const xpriv = passPhrase.toHDPrivateKey(passPhrase.toString(), network);
+                    
+                    // Store only public information in database
+                    walletXpub = xpriv.xpubkey;
+                    walletAddress = xpriv.publicKey.toAddress().toString();
+                    
+                    // For development only - log sensitive data (REMOVE IN PRODUCTION)
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('DEVELOPMENT MODE - Sensitive wallet data:');
+                        console.log('Private Key:', xpriv.privateKey.toString());
+                        console.log('Mnemonic:', passPhrase.toString());
+                    }
+                    
+                    // In a real application, you might encrypt sensitive data with a user-provided key
+                    // or use a secure vault service instead of storing in your database
+                }
+                
+                const wallet = await Wallet.create({
+                    wallet_id: walletId, 
+                    wallet_for: userId, 
+                    wallet_crypto: crypto, 
+                    wallet_xpub: walletXpub, 
+                    wallet_address: walletAddress, 
+                    wallet_balance: walletBalance
                 });
                 
                 res.status(201).json({
                     success: true,
-                    method: "create", // Fixed: String literal instead of function reference
-                    transaction: transaction
+                    method: "create",
+                    wallet: wallet
                 });
             } catch(err) {
-                console.error("Transaction creation error:", err);
+                console.error("Wallet address creation error:", err);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during transaction creation"
+                    error: err.message || "An error occurred during wallet address creation"
                 });
             }
         }
@@ -189,7 +208,6 @@ class TransactionsController {
         }
     }
 
-
     // delete
     delete = () => {
         return async (req, res, next) => {
@@ -226,4 +244,4 @@ class TransactionsController {
     }
 }
 
-module.exports = new TransactionsController()
+module.exports = new WalletsController()

@@ -19,6 +19,8 @@
   "homepage": "https://github.com/morotijani/fiaxit#readme",
   "dependencies": {
     "bcrypt": "^5.1.1",
+    "bitcore-lib": "^10.8.0",
+    "bitcore-mnemonic": "^10.8.0",
     "body-parser": "^1.20.3",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
