@@ -1,5 +1,8 @@
 const Transaction = require("../models/transaction-model");
 const { v4: uuidv4 } = require('uuid')
+const axios = require("axios")
+const bitcore = require("bitcore-lib")
+const sendBitcoin = require('../routes/send-crypto');
 
 class TransactionsController {
 
@@ -57,6 +60,26 @@ class TransactionsController {
     // create
     create = () => {
         return async (req, res, next) => {
+
+
+            // Example usage (DO NOT include private keys in your code - this is just for illustration)
+            async function example() {
+                const result = await sendBitcoin(
+                    'privateKeyInWIFFormat',
+                    'senderBitcoinAddress',
+                    'receiverBitcoinAddress',
+                    0.001, // amount in BTC
+                    true   // use testnet
+                );
+                
+                if (result.txid) {
+                    console.log('Transaction sent successfully:', result.txid);
+                } else {
+                    console.error('Transaction failed:', result.error, result.details);
+                }
+            }
+
+
             try {
                 // validate required fields
                 const requiredFields = ['transaction_amount', 'transaction_crypto_id', 'transaction_to_wallet_address'];
@@ -69,6 +92,11 @@ class TransactionsController {
                     }
                 }
 
+                const cryptoSymbol = req.body.transaction_crypto_symbol
+                if (cryptoSymbol === 'BTC') {
+
+                }
+
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
                 const transactionStatus = 1;
@@ -77,7 +105,7 @@ class TransactionsController {
                     transaction_by: userId, 
                     transaction_amount: req.body.transaction_amount, 
                     transaction_crypto_id: req.body.transaction_crypto_id, 
-                    transaction_crypto_symbol: req.body.transaction_crypto_symbol, 
+                    transaction_crypto_symbol: cryptoSymbol, 
                     transaction_crypto_name: req.body.transaction_crypto_name, 
                     transaction_crypto_price: req.body.transaction_crypto_price, 
                     transaction_to_wallet_address: req.body.transaction_to_wallet_address, 
