@@ -11,7 +11,7 @@ const bitcore = require("bitcore-lib");
  * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
  * @returns {Promise<{txid: string} | {error: string, details: any}>}
  */
-module.exports = async function sendBitcoin(
+async function sendCrypto(
     senderPrivateKey,
     senderAddress,
     receiverAddress, 
@@ -129,3 +129,5 @@ module.exports = async function sendBitcoin(
         };
     }
 };
+
+module.exports = {sendCrypto};
