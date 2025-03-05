@@ -89,51 +89,56 @@ class TransactionsController {
                         });
                     }
                 }
-                const result = {
-                    txid: null
-                }
+                let result;
                 const userId = req.userData.user_id;
-                const transactionId = uuidv4();
+                // const transactionId = uuidv4();
                 const transactionStatus = 1;
                 const cryptoSymbol = req.body.transaction_crypto_symbol
-                const transactionAmount = req.body.transaction_amount;// 0.001 //
-                const senderWalletAddress = req.body.transaction_to_wallet_address
-                const receiverBitcoinAddress = 'mnK8DzedCszq8Mmn1EHq4h7noD4WM2uX36'
+                const transactionAmount = req.body.transaction_amount;
+                const senderWalletAddress = req.body.transaction_from_wallet_address
+                const receiverWalletAddress = req.body.transaction_to_wallet_address
                 if (cryptoSymbol === 'BTC') {
-                    const result = await sendBitcoin(
-                        'd17bcc9b8e96fe64aa946663c51c2b4310c77f59744ebc365c576f7c39bca523', // privateKeyInWIFFormat',
-                        senderWalletAddress, //'senderBitcoinAddress',
-                        receiverBitcoinAddress,
+                    result = await sendBitcoin(
+                        '8a0266da849798990fc4ef37d5ce72c343c33077df53fe2ea574e052d73c189', // privateKeyInWIFFormat',
+                        senderWalletAddress,
+                        receiverWalletAddress,
                         transactionAmount, // amount in BTC
                         true   // use testnet
                     );
                     
                     if (result.txid) {
                         console.log('Transaction sent successfully:', result.txid);
+                        console.log('result:', result);
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
+                        res.status(422).json({
+                            success: false,
+                            message: "Transaction failed", 
+                            result: result.error,
+                            details: result.details
+                        });
                     }
                 }
 
-                if (result) {                
+                if (result && result.txid) {
                     const transaction = await Transaction.create({
-                        transaction_id: transactionId, 
+                        transaction_id: result.txid, // transactionId, 
                         transaction_by: userId, 
                         transaction_amount: transactionAmount, 
                         transaction_crypto_id: req.body.transaction_crypto_id, 
                         transaction_crypto_symbol: cryptoSymbol, 
                         transaction_crypto_name: req.body.transaction_crypto_name, 
                         transaction_crypto_price: req.body.transaction_crypto_price, 
-                        transaction_to_wallet_address: senderWalletAddress, 
+                        transaction_from_wallet_address: senderWalletAddress,
+                        transaction_to_wallet_address: receiverWalletAddress, 
                         transaction_message: req.body.transaction_message || null, 
                         transaction_status: transactionStatus
                     });
                     
                     res.status(201).json({
                         success: true,
-                        method: "create", // Fixed: String literal instead of function reference
-                        transaction: transaction, 
-                        blockchain: result
+                        method: "create", 
+                        transaction: transaction
                     });
                 }
             } catch(err) {

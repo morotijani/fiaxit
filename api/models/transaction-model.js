@@ -38,6 +38,10 @@ const Transaction = mysql.define('fiaxit_transactions', {
         type: DataTypes.DECIMAL(20, 8), // DECIMAL for price with high precision
         allowNull: true
     }, 
+    transaction_from_wallet_address: {
+        type: DataTypes.STRING(300),
+        allowNull: false // Assuming this is required
+    }, 
     transaction_to_wallet_address: {
         type: DataTypes.STRING(300),
         allowNull: false // Assuming this is required
