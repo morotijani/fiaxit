@@ -64,7 +64,6 @@ class WalletsController {
                 const crypto = req.params.id;
                 const userId = req.userData.user_id;
                 const walletId = uuidv4();
-                const walletBalance = '0.00';
                 
                 // Default empty wallet data
                 let walletXpub = null;
@@ -82,6 +81,12 @@ class WalletsController {
                     // Store only public information in database
                     walletXpub = xpriv.xpubkey;
                     walletAddress = xpriv.publicKey.toAddress().toString();
+
+                    // encrypt privateKey and passPhrase
+                    // encryptedData = {
+                    //     privateKey: xpriv.privateKey.toString(),
+                    //     mnemonic: passPhrase.toString()
+                    // }
                     
                     // For development only - log sensitive data (REMOVE IN PRODUCTION)
                     if (process.env.NODE_ENV !== 'production') {
@@ -92,6 +97,8 @@ class WalletsController {
                     
                     // In a real application, you might encrypt sensitive data with a user-provided key
                     // or use a secure vault service instead of storing in your database
+                } else if (crypto === 'USDT') {
+                    
                 }
                 
                 const wallet = await Wallet.create({
@@ -100,7 +107,7 @@ class WalletsController {
                     wallet_crypto: crypto, 
                     wallet_xpub: walletXpub, 
                     wallet_address: walletAddress, 
-                    wallet_balance: walletBalance
+                    wallet_encrypted_data: encryptedData
                 });
                 
                 res.status(201).json({

@@ -154,9 +154,10 @@ class TransactionsController {
     getWalletBalance = () => {
         return async (req, res, next) => {
             try {
+                //const crypto = req.params.crypto
                 const walletAddress = req.params.address;
                 const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
+                //if (crypto === 'BTC')
                 if (!walletAddress) {
                     return res.status(400).json({
                         success: false,

@@ -3,10 +3,10 @@ const router = express.Router();
 const TransactionsController = require("../controllers/transaction-controller");
 
 router.post('/send-crypto', TransactionsController.create());
-router.get('/wallet/:address/balance', TransactionsController.getWalletBalance());
 
 // Optional: with query parameter for testnet/mainnet
-// Example usage: /wallet/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/balance?testnet=false
+// Example usage: v1/transactions/wallet/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/balance?testnet=false
+router.get('/wallet/:address/balance', TransactionsController.getWalletBalance());
 
 
 // route grouping
