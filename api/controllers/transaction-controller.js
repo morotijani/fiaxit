@@ -63,23 +63,21 @@ class TransactionsController {
 
 
             // Example usage (DO NOT include private keys in your code - this is just for illustration)
-            async function example() {
-                const result = await sendBitcoin(
-                    'privateKeyInWIFFormat',
-                    'senderBitcoinAddress',
-                    'receiverBitcoinAddress',
-                    0.001, // amount in BTC
-                    true   // use testnet
-                );
+            // async function example() {
+            //     const result = await sendBitcoin(
+            //         'privateKeyInWIFFormat',
+            //         'senderBitcoinAddress',
+            //         'receiverBitcoinAddress',
+            //         0.001, // amount in BTC
+            //         true   // use testnet
+            //     );
                 
-                if (result.txid) {
-                    console.log('Transaction sent successfully:', result.txid);
-                } else {
-                    console.error('Transaction failed:', result.error, result.details);
-                }
-            }
-
-
+            //     if (result.txid) {
+            //         console.log('Transaction sent successfully:', result.txid);
+            //     } else {
+            //         console.error('Transaction failed:', result.error, result.details);
+            //     }
+            // }
             try {
                 // validate required fields
                 const requiredFields = ['transaction_amount', 'transaction_crypto_id', 'transaction_to_wallet_address'];
@@ -91,33 +89,53 @@ class TransactionsController {
                         });
                     }
                 }
-
-                const cryptoSymbol = req.body.transaction_crypto_symbol
-                if (cryptoSymbol === 'BTC') {
-
+                const result = {
+                    txid: null
                 }
-
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
                 const transactionStatus = 1;
-                const transaction = await Transaction.create({
-                    transaction_id: transactionId, 
-                    transaction_by: userId, 
-                    transaction_amount: req.body.transaction_amount, 
-                    transaction_crypto_id: req.body.transaction_crypto_id, 
-                    transaction_crypto_symbol: cryptoSymbol, 
-                    transaction_crypto_name: req.body.transaction_crypto_name, 
-                    transaction_crypto_price: req.body.transaction_crypto_price, 
-                    transaction_to_wallet_address: req.body.transaction_to_wallet_address, 
-                    transaction_message: req.body.transaction_message || null, 
-                    transaction_status: transactionStatus
-                });
-                
-                res.status(201).json({
-                    success: true,
-                    method: "create", // Fixed: String literal instead of function reference
-                    transaction: transaction
-                });
+                const cryptoSymbol = req.body.transaction_crypto_symbol
+                const transactionAmount = req.body.transaction_amount;// 0.001 //
+                const senderWalletAddress = req.body.transaction_to_wallet_address
+                const receiverBitcoinAddress = 'mnK8DzedCszq8Mmn1EHq4h7noD4WM2uX36'
+                if (cryptoSymbol === 'BTC') {
+                    const result = await sendBitcoin(
+                        'd17bcc9b8e96fe64aa946663c51c2b4310c77f59744ebc365c576f7c39bca523', // privateKeyInWIFFormat',
+                        senderWalletAddress, //'senderBitcoinAddress',
+                        receiverBitcoinAddress,
+                        transactionAmount, // amount in BTC
+                        true   // use testnet
+                    );
+                    
+                    if (result.txid) {
+                        console.log('Transaction sent successfully:', result.txid);
+                    } else {
+                        console.error('Transaction failed:', result.error, result.details);
+                    }
+                }
+
+                if (result) {                
+                    const transaction = await Transaction.create({
+                        transaction_id: transactionId, 
+                        transaction_by: userId, 
+                        transaction_amount: transactionAmount, 
+                        transaction_crypto_id: req.body.transaction_crypto_id, 
+                        transaction_crypto_symbol: cryptoSymbol, 
+                        transaction_crypto_name: req.body.transaction_crypto_name, 
+                        transaction_crypto_price: req.body.transaction_crypto_price, 
+                        transaction_to_wallet_address: senderWalletAddress, 
+                        transaction_message: req.body.transaction_message || null, 
+                        transaction_status: transactionStatus
+                    });
+                    
+                    res.status(201).json({
+                        success: true,
+                        method: "create", // Fixed: String literal instead of function reference
+                        transaction: transaction, 
+                        blockchain: result
+                    });
+                }
             } catch(err) {
                 console.error("Transaction creation error:", err);
                 res.status(422).json({

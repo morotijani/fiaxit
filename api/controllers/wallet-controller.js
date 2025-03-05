@@ -1,6 +1,5 @@
 const Wallet = require("../models/wallet-model");
 const { v4: uuidv4 } = require('uuid')
-// const { PrivateKey } = require('bitcore-lib')
 const bitcore = require('bitcore-lib');
 const { PrivateKey, Networks } = bitcore;
 const  Mnemonic = require('bitcore-mnemonic');

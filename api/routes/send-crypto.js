@@ -108,7 +108,8 @@ module.exports = async function sendBitcoin(
             throw new Error("Transaction failed validation");
         }
         
-        // Serialize and broadcast transaction
+        // Serialize and broadcast transaction 
+        // (send the transaction to the blockchIN)
         const serializedTransaction = transaction.serialize();
         
         const broadcastResponse = await axios({

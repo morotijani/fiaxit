@@ -11,7 +11,6 @@ router.route('/')
 router.route('/:id')
     .post(WalletsController.create()) // generate wallet address
     .get(WalletsController.findById()) // get wallet address by id
-    // .patch(WalletsController.update()) // update transaction
     // .delete(WalletsController.delete()); // delete wallet address
 
 module.exports = router;
