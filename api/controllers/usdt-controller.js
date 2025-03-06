@@ -92,8 +92,34 @@ class USDTController {
                     });
                 }
                 
-                const result = await this.usdtService.sendUSDT(
-                    senderPrivateKey,
+                // Validate private key format
+                let formattedPrivateKey = senderPrivateKey;
+                
+                // Check if private key has the 0x prefix, add it if missing
+                if (!formattedPrivateKey.startsWith('0x')) {
+                    formattedPrivateKey = '0x' + formattedPrivateKey;
+                }
+                
+                // Check if private key has the correct length (32 bytes = 64 hex chars + '0x' prefix = 66 chars)
+                if (formattedPrivateKey.length !== 66) {
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid private key format",
+                        details: "Private key must be 64 hexadecimal characters (32 bytes)"
+                    });
+                }
+                
+                // Check if private key contains only valid hex characters
+                if (!/^0x[0-9a-fA-F]{64}$/.test(formattedPrivateKey)) {
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid private key format",
+                        details: "Private key must contain only hexadecimal characters"
+                    });
+                }
+                
+                const result = await this.usdtService.SendUSDT(
+                    formattedPrivateKey,
                     receiverAddress,
                     amount,
                     isTestnet
@@ -122,6 +148,7 @@ class USDTController {
             }
         };
     };
+
 
     /**
      * Get detailed wallet information

@@ -32,15 +32,12 @@ const USDT_ABI = [
 // USDT Contract Address
 const USDT_CONTRACT_ADDRESS = {
     mainnet: "0xdAC17F958D2ee523a2206206994597C13D831ec7", // Ethereum Mainnet 
-    goerli: "0x509Ee0d083DdF8AC028f2a56731412edD63223B9",  // Goerli Testnet
     sepolia: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06"  // Sepolia Testnet (example address)
 }
 
-
 // Infura or Alchemy endpoints
 const NETWORK_ENDPOINTS = {
-    mainnet: process.env.ETH_MAINNET_ENDPOINT || "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
-    goerli: process.env.ETH_GOERLI_ENDPOINT || "https://goerli.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514",
+    mainnet: process.env.ETH_MAINNET_ENDPOINT || "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
     sepolia: process.env.ETH_SEPOLIA_ENDPOINT || "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514"
 }
 
@@ -78,7 +75,7 @@ class USDTService {
                 throw new Error("Invalid Ethereum address");
             }
 
-            const network = isTestnet ? "sepolia" : "mainnet"; // Changed from goerli to sepolia
+            const network = isTestnet ? "sepolia" : "mainnet";
             const provider = new ethers.JsonRpcProvider(NETWORK_ENDPOINTS[network]);
 
             // Create USDT contract instance 
@@ -92,11 +89,11 @@ class USDTService {
             let decimals;
             try {
                 decimals = await usdtContract.decimals();
+                // Convert BigInt to Number if needed
                 decimals = typeof decimals === 'bigint' ? Number(decimals) : decimals;
-
             } catch (error) {
                 console.warn("Failed to get decimals, using default value of 6:", error.message);
-                decimals = 6; // USDT typically has 6 decimals
+                decimals = 6;
             }
 
             // Get raw balance with error handling
@@ -117,15 +114,15 @@ class USDTService {
 
             return {
                 address,
-                network: isTestnet ? "sepolia" : "mainnet", // Changed from goerli to sepolia
+                network: isTestnet ? "sepolia" : "mainnet",
                 usdt: {
                     balance: balance, 
-                    rawBalance: rawBalance.toString(), 
+                    rawBalance: rawBalance.toString(), // Ensure BigInt is converted to string
                     decimals: decimals
                 }, 
                 eth: {
                     balance: ethBalanceFormatted, 
-                    rawBalance: ethBalance.toString()
+                    rawBalance: ethBalance.toString() // Ensure BigInt is converted to string
                 }
             };
         } catch(error) {
@@ -138,6 +135,7 @@ class USDTService {
     }
 
 
+
     /**
      * Send USDT from one address to another
      * @param {string} senderPrivateKey - Private key of the sender
@@ -146,10 +144,25 @@ class USDTService {
      * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
      * @returns {Promise<Object>} Transaction result
      */
-    async sendUST(senderPrivateKey, receiverAddress, amount, isTestnet = true) {
+    async SendUSDT(senderPrivateKey, receiverAddress, amount, isTestnet = true) {
         try {
             if (!senderPrivateKey || !receiverAddress || !amount) {
                 throw new Error("Missing required parameters");
+            }
+
+            // Validate and format private key
+            if (typeof senderPrivateKey !== 'string') {
+                throw new Error("Private key must be a string");
+            }
+            
+            // Ensure private key has 0x prefix
+            if (!senderPrivateKey.startsWith('0x')) {
+                senderPrivateKey = '0x' + senderPrivateKey;
+            }
+            
+            // Validate private key format
+            if (!/^0x[0-9a-fA-F]{64}$/.test(senderPrivateKey)) {
+                throw new Error("Invalid private key format. Must be a 64-character hex string with 0x prefix.");
             }
 
             if (!ethers.isAddress(receiverAddress)) {
@@ -160,7 +173,15 @@ class USDTService {
 
             // Create provider with sender's private key 
             const provider = new ethers.JsonRpcProvider(NETWORK_ENDPOINTS[network]);
-            const wallet = new ethers.Wallet(senderPrivateKey, provider);
+            
+            // Create wallet with validated private key
+            let wallet;
+            try {
+                wallet = new ethers.Wallet(senderPrivateKey, provider);
+            } catch (error) {
+                throw new Error(`Invalid private key: ${error.message}`);
+            }
+        
             const senderAddress = wallet.address;
 
             // Create contract instance
