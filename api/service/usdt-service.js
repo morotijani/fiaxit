@@ -134,8 +134,6 @@ class USDTService {
         }
     }
 
-
-
     /**
      * Send USDT from one address to another
      * @param {string} senderPrivateKey - Private key of the sender

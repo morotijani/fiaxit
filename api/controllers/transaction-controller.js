@@ -1,7 +1,6 @@
 const Transaction = require("../models/transaction-model");
 const { v4: uuidv4 } = require('uuid')
-const { sendCrypto } = require('../routes/send-crypto');
-
+const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class TransactionsController {
 
@@ -95,7 +94,7 @@ class TransactionsController {
                 const senderWalletAddress = req.body.transaction_from_wallet_address
                 const receiverWalletAddress = req.body.transaction_to_wallet_address
                 if (cryptoSymbol === 'BTC') {
-                    result = await sendCrypto(
+                    result = await BitcoinWalletService.sendCrypto(
                         '8918b63eeb0522002a4eb7c693ae9e93fa3b28d129e32ef7f460c62e02f6f982', // privateKeyInWIFFormat',
                         senderWalletAddress,
                         receiverWalletAddress,
@@ -115,7 +114,7 @@ class TransactionsController {
                             details: result.details
                         });
                     }
-                }
+                } else if (cryptoSymbol === 'USDT') {}
 
                 if (result && result.txid) {
                     const transaction = await Transaction.create({

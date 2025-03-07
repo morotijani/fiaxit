@@ -4,6 +4,7 @@ const bitcore = require('bitcore-lib');
 const { PrivateKey, Networks } = bitcore;
 const  Mnemonic = require('bitcore-mnemonic');
 const USDTService = require('../service/usdt-service');
+const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class WalletsController {
 

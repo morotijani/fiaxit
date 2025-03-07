@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TransactionsController = require("../controllers/transaction-controller");
 
-router.post('/send-crypto', TransactionsController.create());
+router.post('/send', TransactionsController.create());
 
 // route grouping
 router.route('/') 
