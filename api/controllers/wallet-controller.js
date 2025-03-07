@@ -3,8 +3,13 @@ const { v4: uuidv4 } = require('uuid')
 const bitcore = require('bitcore-lib');
 const { PrivateKey, Networks } = bitcore;
 const  Mnemonic = require('bitcore-mnemonic');
+const USDTService = require('../service/usdt-service');
 
 class WalletsController {
+
+    constructor() {
+        this.usdtService = new USDTService();
+    }
 
     // get all method
     getAll = () => {
@@ -69,6 +74,8 @@ class WalletsController {
                 let walletXpub = null;
                 let walletAddress = null;
                 let encryptedData = null; // For storing encrypted sensitive data if needed
+                let walletPrivatekey = null;
+                let walletMnemonic = null;
                 
                 if (crypto === 'BTC') {
                     // Use testnet for development, mainnet for production
@@ -81,6 +88,8 @@ class WalletsController {
                     // Store only public information in database
                     walletXpub = xpriv.xpubkey;
                     walletAddress = xpriv.publicKey.toAddress().toString();
+                    walletPrivatekey = xpriv.privateKey.toString(); // For development only
+                    walletMnemonic = passPhrase.toString(); // For development only
 
                     // encrypt privateKey and passPhrase
                     // encryptedData = {
@@ -98,7 +107,21 @@ class WalletsController {
                     // In a real application, you might encrypt sensitive data with a user-provided key
                     // or use a secure vault service instead of storing in your database
                 } else if (crypto === 'USDT') {
-                    
+                    try {
+                        const wallet = this.usdtService.generateWallet();
+
+                        walletXpub = null 
+                        walletAddress = wallet.address
+                        walletPrivatekey = wallet.privateKey
+                        walletMnemonic = wallet.mnemonic
+                    } catch (error) {
+                        console.error("USDT Wallet generation error:", error);
+                        res.status(500).json({
+                            success: false,
+                            error: "Failed to generate wallet",
+                            details: error.message
+                        });
+                    }
                 }
                 
                 const wallet = await Wallet.create({
@@ -107,12 +130,13 @@ class WalletsController {
                     wallet_crypto: crypto, 
                     wallet_xpub: walletXpub, 
                     wallet_address: walletAddress, 
-                    wallet_encrypted_data: encryptedData
+                    wallet_privatekey: walletPrivatekey,
+                    wallet_mnemonic: walletMnemonic
                 });
                 
                 res.status(201).json({
                     success: true,
-                    method: "create",
+                    method: "createAndGenerateWallet",
                     wallet: wallet
                 });
             } catch(err) {
@@ -248,6 +272,7 @@ class WalletsController {
             }
         }
     }
+
 }
 
 module.exports = new WalletsController()

@@ -1,4 +1,4 @@
-const USDTService = require('../middleware/usdt-service');
+const USDTService = require('../service/usdt-service');
 
 class USDTController {
     constructor() {
@@ -8,30 +8,30 @@ class USDTController {
     /**
      * Generate a new Ethereum wallet
      */
-    generateWallet = () => {
-        return async (req, res) => {
-            try {
-                const wallet = this.usdtService.generateWallet();
+    // generateWallet = () => {
+    //     return async (req, res) => {
+    //         try {
+    //             const wallet = this.usdtService.generateWallet();
                 
-                res.status(201).json({
-                    success: true,
-                    method: "generateWallet",
-                    wallet: {
-                        address: wallet.address,
-                        privateKey: wallet.privateKey,
-                        mnemonic: wallet.mnemonic
-                    }
-                });
-            } catch (error) {
-                console.error("Wallet generation error:", error);
-                res.status(500).json({
-                    success: false,
-                    error: "Failed to generate wallet",
-                    details: error.message
-                });
-            }
-        };
-    };
+    //             res.status(201).json({
+    //                 success: true,
+    //                 method: "generateWallet",
+    //                 wallet: {
+    //                     address: wallet.address,
+    //                     privateKey: wallet.privateKey,
+    //                     mnemonic: wallet.mnemonic
+    //                 }
+    //             });
+    //         } catch (error) {
+    //             console.error("Wallet generation error:", error);
+    //             res.status(500).json({
+    //                 success: false,
+    //                 error: "Failed to generate wallet",
+    //                 details: error.message
+    //             });
+    //         }
+    //     };
+    // };
 
     /**
      * Get USDT balance for an address

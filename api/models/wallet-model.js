@@ -24,16 +24,18 @@ const Wallet = mysql.define('fiaxit_wallets', {
     },
     wallet_xpub: {
         type: DataTypes.STRING(300),
-        allowNull: false
     }, 
     wallet_address: {
         type: DataTypes.STRING(300),
         allowNull: false
     }, 
-    wallet_balance: {
-        type: DataTypes.DECIMAL(15, 8), // DECIMAL is better for financial data than DOUBLE
+    wallet_privatekey: {
+        type: DataTypes.STRING(),
         allowNull: false
-    },
+    }, 
+    wallet_mnemonic: {
+        type: DataTypes.STRING(),
+    }, 
     wallet_status: {
         type: DataTypes.TINYINT(1), // Use TINYINT(1) for boolean-like fields
         defaultValue: 0,
