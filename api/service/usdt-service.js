@@ -44,9 +44,9 @@ const NETWORK_ENDPOINTS = {
 class USDTService {
 
     /**
-     * Generate a new Ethereum wallet
-     * @returns {Object} Wallet information including address and private key
-     */
+        * Generate a new Ethereum wallet
+        * @returns {Object} Wallet information including address and private key
+    */
     generateWallet() {
         try {
             // Create a random wallet
@@ -64,11 +64,11 @@ class USDTService {
     }
 
     /**
-     * Get USDT balance for an Ethereum address
-     * @param {string} address - Ethereum address to check
-     * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
-     * @returns {Promise<Object>} Balance information
-     */
+        * Get USDT balance for an Ethereum address
+        * @param {string} address - Ethereum address to check
+        * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+        * @returns {Promise<Object>} Balance information
+    */
     async getUSDTBalance(address, isTestnet = true) {
         try {
             if (!ethers.isAddress(address)) {
@@ -135,13 +135,13 @@ class USDTService {
     }
 
     /**
-     * Send USDT from one address to another
-     * @param {string} senderPrivateKey - Private key of the sender
-     * @param {string} receiverAddress - Ethereum address of the recipient
-     * @param {number|string} amount - Amount of USDT to send
-     * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
-     * @returns {Promise<Object>} Transaction result
-     */
+        * Send USDT from one address to another
+        * @param {string} senderPrivateKey - Private key of the sender
+        * @param {string} receiverAddress - Ethereum address of the recipient
+        * @param {number|string} amount - Amount of USDT to send
+        * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+        * @returns {Promise<Object>} Transaction result
+    */
     async SendUSDT(senderPrivateKey, receiverAddress, amount, isTestnet = true) {
         try {
             if (!senderPrivateKey || !receiverAddress || !amount) {
@@ -243,11 +243,11 @@ class USDTService {
     }
 
     /**
-     * Get detailed wallet information including transaction history
-     * @param {string} address - Ethereum address
-     * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
-     * @returns {Promise<Object>} Wallet information
-     */
+        * Get detailed wallet information including transaction history
+        * @param {string} address - Ethereum address
+        * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+        * @returns {Promise<Object>} Wallet information
+    */
     async getWalletInfo(address, isTestnet = true) {
         try {
             if (!ethers.isAddress(address)) {

@@ -1,8 +1,45 @@
 const Transaction = require("../models/transaction-model");
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
+const Bitcoin = require("../middleware/bitcoin-controller")
 
 class TransactionsController {
+
+    sbtc = () => {
+        return async (req, res, next) => {
+            try {
+                const { privateKey,
+                    toAddress,
+                    amount,
+                    feeRate } = req.body;
+                const tt = req.query.tt;
+
+                // Validate required parameters
+                if (!privateKey || !toAddress || !amount || !feeRate) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Missing required parameters"
+                    });
+                }
+
+                const result = Bitcoin.sendBitcoin(privateKey,
+                    toAddress,
+                    amount,
+                    feeRate );
+                await result(req, res)
+                // res.status(200).json({
+                //     success: true,
+                //     data: result
+                // });
+            } catch (error) {
+                console.error("Bitcoin send error:", error);
+                res.status(500).json({
+                    success: false,
+                    error: error.message || "Failed to send Bitcoin"
+                });
+            }
+        }
+    }
 
     // get all method
     getAll = () => {
@@ -58,22 +95,6 @@ class TransactionsController {
     // create
     create = () => {
         return async (req, res, next) => {
-            // Example usage (DO NOT include private keys in your code - this is just for illustration)
-            // async function example() {
-            //     const result = await sendCrypto(
-            //         'privateKeyInWIFFormat',
-            //         'senderBitcoinAddress',
-            //         'receiverBitcoinAddress',
-            //         0.001, // amount in BTC
-            //         true   // use testnet
-            //     );
-                
-            //     if (result.txid) {
-            //         console.log('Transaction sent successfully:', result.txid);
-            //     } else {
-            //         console.error('Transaction failed:', result.error, result.details);
-            //     }
-            // }
             try {
                 // validate required fields
                 const requiredFields = ['transaction_amount', 'transaction_crypto_id', 'transaction_to_wallet_address'];
@@ -96,9 +117,9 @@ class TransactionsController {
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
                         '8918b63eeb0522002a4eb7c693ae9e93fa3b28d129e32ef7f460c62e02f6f982', // privateKeyInWIFFormat',
-                        senderWalletAddress,
-                        receiverWalletAddress,
-                        transactionAmount, // amount in BTC
+                        senderWalletAddress, 
+                        receiverWalletAddress, 
+                        transactionAmount, // amount in BTC 
                         true   // use testnet
                     );
                     

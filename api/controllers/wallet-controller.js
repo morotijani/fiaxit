@@ -5,12 +5,28 @@ const { PrivateKey, Networks } = bitcore;
 const  Mnemonic = require('bitcore-mnemonic');
 const USDTService = require('../service/usdt-service');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
+const Bitcoin = require("../middleware/bitcoin-controller")
 
 class WalletsController {
 
     constructor() {
         this.usdtService = new USDTService();
     }
+
+    // generate wallet
+    getWalletInfo = () => {
+        return async (req, res) => {
+            try {
+                const add = req.params.address;
+                const info = Bitcoin.getWalletInfo(add, true); // true for testnet
+                await info(req, res)
+                return info;
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        }
+    }
+
 
     // get all method
     getAll = () => {
@@ -64,7 +80,7 @@ class WalletsController {
     }
 
     // create
-    create = () => {
+    generateWallet = () => {
         return async (req, res, next) => {
             try {
                 const crypto = req.params.id;
@@ -79,18 +95,28 @@ class WalletsController {
                 let walletMnemonic = null;
                 
                 if (crypto === 'BTC') {
+
+                    const walletResponse = await Bitcoin.generateWallet(true);
+                    const wallet = walletResponse.wallet;
+                    console.log('Generated wallet:', wallet);
+                    
+                    walletXpub = null;
+                    walletAddress = wallet.address
+                    walletPrivatekey = wallet.privateKey // For development only
+                    walletMnemonic = wallet.mnemonic; // For development only
+                                
                     // Use testnet for development, mainnet for production
-                    const network = process.env.NODE_ENV === 'production' ? Networks.mainnet : Networks.testnet;
+                    // const network = process.env.NODE_ENV === 'production' ? Networks.mainnet : Networks.testnet;
                     
-                    // Create a single HD wallet
-                    const passPhrase = new Mnemonic(Mnemonic.Words.SPANISH);
-                    const xpriv = passPhrase.toHDPrivateKey(passPhrase.toString(), network);
+                    // // Create a single HD wallet
+                    // const passPhrase = new Mnemonic(Mnemonic.Words.SPANISH);
+                    // const xpriv = passPhrase.toHDPrivateKey(passPhrase.toString(), network);
                     
-                    // Store only public information in database
-                    walletXpub = xpriv.xpubkey;
-                    walletAddress = xpriv.publicKey.toAddress().toString();
-                    walletPrivatekey = xpriv.privateKey.toString(); // For development only
-                    walletMnemonic = passPhrase.toString(); // For development only
+                    // // Store only public information in database
+                    // walletXpub = xpriv.xpubkey;
+                    // walletAddress = xpriv.publicKey.toAddress().toString();
+                    // walletPrivatekey = xpriv.privateKey.toString(); // For development only
+                    // walletMnemonic = passPhrase.toString(); // For development only
 
                     // encrypt privateKey and passPhrase
                     // encryptedData = {
@@ -99,22 +125,23 @@ class WalletsController {
                     // }
                     
                     // For development only - log sensitive data (REMOVE IN PRODUCTION)
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log('DEVELOPMENT MODE - Sensitive wallet data:');
-                        console.log('Private Key:', xpriv.privateKey.toString());
-                        console.log('Mnemonic:', passPhrase.toString());
-                    }
+                    // if (process.env.NODE_ENV !== 'production') {
+                    //     console.log('DEVELOPMENT MODE - Sensitive wallet data:');
+                    //     console.log('Private Key:', xpriv.privateKey.toString());
+                    //     console.log('Mnemonic:', passPhrase.toString());
+                    // }
                     
                     // In a real application, you might encrypt sensitive data with a user-provided key
                     // or use a secure vault service instead of storing in your database
                 } else if (crypto === 'USDT') {
                     try {
                         const wallet = this.usdtService.generateWallet();
-
                         walletXpub = null 
                         walletAddress = wallet.address
                         walletPrivatekey = wallet.privateKey
                         walletMnemonic = wallet.mnemonic
+                        
+                        console.log("USDT Wallet generated:", wallet);
                     } catch (error) {
                         console.error("USDT Wallet generation error:", error);
                         res.status(500).json({
@@ -123,6 +150,12 @@ class WalletsController {
                             details: error.message
                         });
                     }
+                } else {
+                    return res.status(400).json({
+                        success: false,
+                        method: "createAndGenerateWallet",
+                        error: "Invalid crypto currency provided"
+                    });
                 }
                 
                 const wallet = await Wallet.create({

@@ -1,7 +1,73 @@
 const axios = require("axios")
 const bitcore = require("bitcore-lib")
+const bitcoin = require('bitcoinjs-lib');
+const ecc = require('tiny-secp256k1');
+const { BIP32Factory } = require('bip32');
+const bip39 = require('bip39');
+const { ECPairFactory } = require('ecpair');
+
+// Initialize BIP32 with the required elliptic curve implementation
+const bip32 = BIP32Factory(ecc);
+const ECPair = ECPairFactory(ecc);
 
 class BitcoinWalletService {
+	constructor() {
+		// Default to testnet, can be changed to bitcoin.networks.bitcoin for mainnet
+		this.network = bitcoin.networks.testnet;
+		
+		// BlockCypher API endpoints
+		this.apiEndpoints = {
+		mainnet: 'https://api.blockcypher.com/v1/btc/main',
+		testnet: 'https://api.blockcypher.com/v1/btc/test3'
+		};
+	}
+
+	/**
+	   * Generate a new Bitcoin wallet
+	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+	   * @returns {Object} Wallet information including address and private key
+	*/
+	generateWallet(isTestnet = true) {
+		try {
+			// Set network based on isTestnet parameter
+			this.network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
+			
+			// Generate a random mnemonic (seed phrase)
+			const mnemonic = bip39.generateMnemonic();
+			
+			// Convert mnemonic to seed
+			const seed = bip39.mnemonicToSeedSync(mnemonic);
+			
+			// Create a root node from the seed
+			const root = bip32.fromSeed(seed, this.network);
+		  
+			// Derive the first account's node (m/44'/0'/0'/0/0)
+			const path = isTestnet ? "m/44'/1'/0'/0/0" : "m/44'/0'/0'/0/0";
+			const child = root.derivePath(path);
+			
+			// Get the private key in WIF format
+			const privateKey = child.toWIF();
+			
+			// Create an ECPair from the child node's private key
+			const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: this.network });
+		  
+			// Get the public key and create a P2PKH address
+			const { address } = bitcoin.payments.p2pkh({
+				pubkey: keyPair.publicKey,
+				network: this.network
+		  	});
+		  
+			return {
+				address,
+				privateKey,
+				mnemonic,
+				network: isTestnet ? 'testnet' : 'mainnet'
+			};
+		} catch (error) {
+		  	console.error("Error generating Bitcoin wallet:", error);
+		  	throw new Error(`Failed to generate wallet: ${error.message}`);
+		}
+	}
 
 	/**
 	* Send Bitcoin from one address to another
@@ -24,13 +90,39 @@ class BitcoinWalletService {
 			if (!senderPrivateKey || !senderAddress || !receiverAddress || !amountToSend) {
 				throw new Error("Missing required parameters");
 			}
+
+			// Validate private key format
+			if (!senderPrivateKey || typeof senderPrivateKey !== 'string') {
+				throw new Error("Invalid private key: must be a non-empty string");
+			}
+
+			// Validate recipient address
+			if (!this.isValidBitcoinAddress(receiverAddress, isTestnet)) {
+				throw new Error("Invalid recipient Bitcoin address");
+			}
 			
 			// Convert BTC to satoshis
 			const satoshiToSend = Math.round(amountToSend * 100000000);
 			if (satoshiToSend <= 0) {
 				throw new Error("Amount must be greater than 0");
 			}
+
+			// Import the private key with proper error handling
+			let keyPair;
+			try {
+			  	keyPair = ECPair.fromWIF(senderPrivateKey, this.network);
+			} catch (error) {
+			  	throw new Error(`Invalid private key: ${error.message}`);
+			}
+
+			// Get the sender's address
+			const { address: fromAddress } = bitcoin.payments.p2pkh({
+				pubkey: keyPair.publicKey,
+				network: this.network
+			});
 			
+			console.log(`Sending from address: ${fromAddress}`);
+
 			// Set network-specific variables
 			const networkBaseUrl = isTestnet 
 				? "https://blockstream.info/testnet/api" 
@@ -210,111 +302,145 @@ class BitcoinWalletService {
         }
     }
 
-    // Get bitcoin wallet info
-    getWalletInfo = () => {
-        return async (req, res) => {
-            try {
-                const address = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
-                if (!address) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Address parameter is required"
-                    });
-                }
-                
-                // Validate Bitcoin address format
-                try {
-                    // This will throw an error if the address is invalid
-                    new bitcore.Address(address);
-                } catch (error) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid Bitcoin address format"
-                    });
-                }
-                
-                // Set network-specific variables
-                const networkBaseUrl = isTestnet 
-                    ? "https://blockstream.info/testnet/api" 
-                    : "https://blockstream.info/api";
-                
-                // Get UTXOs for the address
-                const utxoResponse = await axios({
-                    method: "GET",
-                    url: `${networkBaseUrl}/address/${address}/utxo`,
-                    timeout: 5000
-                });
-                
-                const utxos = utxoResponse.data || [];
-                
-                // Calculate total balance from UTXOs
-                let totalBalance = 0;
-                for (const utxo of utxos) {
-                    totalBalance += utxo.value;
-                }
-                
-                // Convert satoshis to BTC for easier reading
-                const balanceBTC = totalBalance / 100000000;
-                
-                // Get transaction history (optional)
-                const txHistoryResponse = await axios({
-                    method: "GET",
-                    url: `${networkBaseUrl}/address/${address}/txs`,
-                    timeout: 5000
-                }).catch(error => {
-                    console.warn("Could not fetch transaction history:", error.message);
-                    return { data: [] };
-                });
-                
-                const txHistory = txHistoryResponse.data || [];
-                
-                // Process transaction history to get recent transactions
-                const recentTransactions = txHistory.slice(0, 5).map(tx => {
-                    return {
-                        txid: tx.txid,
-                        confirmed: tx.status.confirmed,
-                        timestamp: tx.status.block_time ? new Date(tx.status.block_time * 1000).toISOString() : null,
-                        fee: tx.fee || 0
-                    };
-                });
-                
-                // Format the response
-                res.status(200).json({
-                    success: true,
-                    method: "getWalletInfo", 
-                    data: {
-                        address: address,
-                        network: isTestnet ? 'testnet' : 'mainnet',
-                        balance: {
-                            satoshis: totalBalance,
-                            btc: balanceBTC.toFixed(8)
-                        },
-                        utxos: {
-                            count: utxos.length,
-                            details: utxos.map(utxo => ({
-                                txid: utxo.txid,
-                                vout: utxo.vout,
-                                value: utxo.value,
-                                status: utxo.status
-                            }))
-                        },
-                        recentTransactions: recentTransactions,
-                        transactionCount: txHistory.length
-                    }
-                });
-            } catch (error) {
-                console.error("Wallet info error:", error);
-                res.status(500).json({
-                    success: false,
-                    error: "Failed to get wallet information",
-                    details: error.message
-                });
-            }
-        }
-    }
+	/**
+	   * Get Bitcoin wallet information
+	   * @param {string} address - Bitcoin address
+	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+	   * @returns {Promise<Object>} Wallet information
+	*/
+	async getWalletInfo(address, isTestnet = true) {
+		try {
+			// Validate Bitcoin address
+			if (!this.isValidBitcoinAddress(address, isTestnet)) {
+				throw new Error("Invalid Bitcoin address");
+			}
+			
+			const network = isTestnet ? 'testnet' : 'mainnet';
+			const apiUrl = `${this.apiEndpoints[network]}/addrs/${address}`;
+			
+			// Fetch address information from BlockCypher API
+			const response = await axios.get(apiUrl);
+			const data = response.data;
+			
+			// Fetch recent transactions
+			const txsUrl = `${apiUrl}/full?limit=10`;
+			const txsResponse = await axios.get(txsUrl);
+			const txsData = txsResponse.data;
+			
+			// Format transactions
+			const transactions = txsData.txs ? txsData.txs.map(tx => {
+				// Calculate if this transaction is sending or receiving for this address
+				let type = 'unknown';
+				let amount = 0;
+				
+				// Check inputs (sending)
+				const isInput = tx.inputs.some(input => 
+				input.addresses && input.addresses.includes(address)
+				);
+				
+				// Check outputs (receiving)
+				const isOutput = tx.outputs.some(output => 
+				output.addresses && output.addresses.includes(address)
+				);
+				
+				if (isInput && isOutput) {
+				type = 'self';
+				
+				// Calculate the change amount
+				const totalOut = tx.outputs.reduce((sum, output) => {
+					if (output.addresses && !output.addresses.includes(address)) {
+					return sum + output.value;
+					}
+					return sum;
+				}, 0);
+				
+				amount = -totalOut;
+				} else if (isInput) {
+				type = 'sent';
+				
+				// Calculate the sent amount (excluding change)
+				const totalOut = tx.outputs.reduce((sum, output) => {
+					if (output.addresses && !output.addresses.includes(address)) {
+					return sum + output.value;
+					}
+					return sum;
+				}, 0);
+				
+				amount = -totalOut;
+				} else if (isOutput) {
+				type = 'received';
+				
+				// Calculate the received amount
+				amount = tx.outputs.reduce((sum, output) => {
+					if (output.addresses && output.addresses.includes(address)) {
+						return sum + output.value;
+					}
+					return sum;
+				}, 0);
+			}
+				
+				return {
+					txid: tx.hash,
+					type,
+					amount: amount / 100000000, // Convert satoshis to BTC
+					fee: tx.fees / 100000000,
+					confirmations: tx.confirmations || 0,
+					blockHeight: tx.block_height || null,
+					timestamp: tx.received ? new Date(tx.received).toISOString() : null,
+					inputs: tx.inputs.map(input => ({
+						addresses: input.addresses || [],
+						value: input.output_value ? input.output_value / 100000000 : 0
+					})),
+					outputs: tx.outputs.map(output => ({
+						addresses: output.addresses || [],
+						value: output.value ? output.value / 100000000 : 0
+					}))
+				};
+			}) : [];
+			
+			return {
+				success: true,
+				address,
+				network,
+				balance: {
+					confirmed: data.balance / 100000000, // Convert satoshis to BTC
+					unconfirmed: data.unconfirmed_balance / 100000000,
+					total: (data.balance + data.unconfirmed_balance) / 100000000
+				},
+				transactions,
+				txCount: data.n_tx,
+				totalReceived: data.total_received / 100000000,
+				totalSent: data.total_sent / 100000000,
+				lastUpdated: new Date().toISOString()
+			};
+		} catch (error) {
+			console.error("Error getting Bitcoin wallet info:", error);
+			return {
+				success: false,
+				error: "Failed to get wallet info",
+				details: error.message
+			};
+		}
+	}
+
+	/**
+	   * Validate a Bitcoin address
+	   * @param {string} address - Bitcoin address to validate
+	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
+	   * @returns {boolean} Whether the address is valid
+	*/
+	isValidBitcoinAddress(address, isTestnet = true) {
+		try {
+			const network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
+		
+			// Try to decode the address
+			bitcoin.address.toOutputScript(address, network);
+			return true;
+		} catch (error) {
+			return false;
+		}
+	}
 
 }
 
-module.exports = new BitcoinWalletService() // instantiate class and add to module so that we can use it anywhere else
+module.exports = new BitcoinWalletService()

@@ -14,6 +14,10 @@ const Transaction = mysql.define('fiaxit_transactions', {
         type: DataTypes.STRING(100),
         allowNull: false,
     },
+    transaction_hash_id: {
+        type: DataTypes.STRING(100),
+        allowNull: false
+    },
     transaction_by: {
         type: DataTypes.STRING(100),
         allowNull: false
@@ -68,7 +72,8 @@ const Transaction = mysql.define('fiaxit_transactions', {
     }
 }, {
     indexes: [
-        {fields: ['transaction_id']},
+        {fields: ['transaction_id']}, 
+        {fields: ['transaction_hash_id']},
         {fields: ['transaction_by']},
         {fields: ['transaction_to_wallet_address']},
         {fields: ['transaction_status']}
