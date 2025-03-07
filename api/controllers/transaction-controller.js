@@ -96,8 +96,10 @@ class TransactionsController {
     create = () => {
         return async (req, res, next) => {
             try {
+                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+
                 // validate required fields
-                const requiredFields = ['transaction_amount', 'transaction_crypto_id', 'transaction_to_wallet_address'];
+                const requiredFields = ['amount', 'crypto_id', 'toAddress', 'privateKey'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
@@ -108,19 +110,20 @@ class TransactionsController {
                 }
                 let result;
                 const userId = req.userData.user_id;
-                // const transactionId = uuidv4();
+                const transactionId = uuidv4();
                 const transactionStatus = 1;
-                const cryptoSymbol = req.body.transaction_crypto_symbol
-                const transactionAmount = req.body.transaction_amount;
-                const senderWalletAddress = req.body.transaction_from_wallet_address
-                const receiverWalletAddress = req.body.transaction_to_wallet_address
+                const cryptoSymbol = req.body.crypto_symbol
+                const transactionAmount = req.body.amount;
+                const privateKey = req.body.privateKey
+                const receiverWalletAddress = req.body.toAddress 
+                const feeRate = req.body.feeRate || 10 //0.0001
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
-                        '8918b63eeb0522002a4eb7c693ae9e93fa3b28d129e32ef7f460c62e02f6f982', // privateKeyInWIFFormat',
-                        senderWalletAddress, 
+                        privateKey, 
                         receiverWalletAddress, 
-                        transactionAmount, // amount in BTC 
-                        true   // use testnet
+                        transactionAmount, 
+                        feeRate, 
+                        isTestnet 
                     );
                     
                     if (result.txid) {
@@ -129,7 +132,8 @@ class TransactionsController {
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
                         res.status(422).json({
-                            success: false,
+                            success: false, 
+                            method: "createAndSend" + cryptoSymbol,
                             message: "Transaction failed", 
                             result: result.error,
                             details: result.details
@@ -139,22 +143,23 @@ class TransactionsController {
 
                 if (result && result.txid) {
                     const transaction = await Transaction.create({
-                        transaction_id: result.txid, // transactionId, 
+                        transaction_id: transactionId, 
+                        transaction_hash_id: result.txid,
                         transaction_by: userId, 
                         transaction_amount: transactionAmount, 
-                        transaction_crypto_id: req.body.transaction_crypto_id, 
+                        transaction_crypto_id: req.body.crypto_id, 
                         transaction_crypto_symbol: cryptoSymbol, 
-                        transaction_crypto_name: req.body.transaction_crypto_name, 
-                        transaction_crypto_price: req.body.transaction_crypto_price, 
-                        transaction_from_wallet_address: senderWalletAddress,
+                        transaction_crypto_name: req.body.crypto_name, 
+                        transaction_crypto_price: req.body.crypto_price, 
+                        transaction_from_wallet_address: result.senderWalletAddress,
                         transaction_to_wallet_address: receiverWalletAddress, 
-                        transaction_message: req.body.transaction_message || null, 
+                        transaction_message: req.body.note || null, 
                         transaction_status: transactionStatus
                     });
                     
                     res.status(201).json({
                         success: true,
-                        method: "create", 
+                        method: "createAndSend" + cryptoSymbol, 
                         transaction: transaction
                     });
                 }

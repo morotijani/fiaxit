@@ -80,14 +80,14 @@ class BitcoinWalletService {
 	*/
 	async sendCrypto(
 		senderPrivateKey,
-		senderAddress,
+		// senderAddress,
 		receiverAddress, 
 		amountToSend,
-		isTestnet = true
+		isTestnet
 	) {
 		try {
 			// Validate inputs
-			if (!senderPrivateKey || !senderAddress || !receiverAddress || !amountToSend) {
+			if (!senderPrivateKey || !receiverAddress || !amountToSend) {
 				throw new Error("Missing required parameters");
 			}
 
@@ -131,7 +131,7 @@ class BitcoinWalletService {
 			// Get UTXOs for the address
 			const utxoResponse = await axios({
 				method: "GET",
-				url: `${networkBaseUrl}/address/${senderAddress}/utxo`,
+				url: `${networkBaseUrl}/address/${fromAddress}/utxo`,
 				timeout: 5000 // Add timeout for API calls
 			});
 			
@@ -149,8 +149,8 @@ class BitcoinWalletService {
 			for (const utxo of utxos) {
 				inputs.push({
 					satoshis: utxo.value,
-					script: bitcore.Script.buildPublicKeyHashOut(senderAddress).toHex(),
-					address: senderAddress,
+					script: bitcore.Script.buildPublicKeyHashOut(fromAddress).toHex(),
+					address: fromAddress,
 					txId: utxo.txid,
 					outputIndex: utxo.vout
 				});
@@ -184,14 +184,14 @@ class BitcoinWalletService {
 			
 			// Check if we have enough funds
 			if (totalAmountAvailable - satoshiToSend - fee < 0) {
-				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable/100000000} BTC, Required: ${(satoshiToSend + fee)/100000000} BTC`);
+				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable/100000000} BTC, Required: ${(satoshiToSend + fee)/100000000} BTC, Fee: ${fee/100000000} BTC`);
 			}
 			
 			// Create and sign transaction
 			const transaction = new bitcore.Transaction()
 				.from(inputs)
 				.to(receiverAddress, satoshiToSend)
-				.change(senderAddress)
+				.change(fromAddress)
 				.fee(fee)
 				.sign(senderPrivateKey);
 			
@@ -212,7 +212,10 @@ class BitcoinWalletService {
 				timeout: 10000
 			});
 			
-			return { txid: broadcastResponse.data };
+			return { 
+				txid: broadcastResponse.data, 
+				senderWalletAddress: fromAddress 
+			};
 			
 		} catch (error) {
 			console.error("Bitcoin transaction error:", error.message);

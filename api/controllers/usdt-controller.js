@@ -61,13 +61,14 @@ class USDTController {
                 
                 res.status(200).json({
                     success: true,
-                    method: "getBalance",
+                    method: "getUSDTBalance",
                     data: balance
                 });
             } catch (error) {
                 console.error("Balance check error:", error);
                 res.status(500).json({
                     success: false,
+                    method: "getUSDTBalance",
                     error: "Failed to get balance",
                     details: error.message
                 });
@@ -178,13 +179,14 @@ class USDTController {
                 
                 res.status(200).json({
                     success: true,
-                    method: "getWalletInfo",
+                    method: "getUSDTWalletInfo",
                     data: walletInfo
                 });
             } catch (error) {
                 console.error("Wallet info error:", error);
                 res.status(500).json({
-                    success: false,
+                    success: false, 
+                    method: "getUSDTWalletInfo",
                     error: "Failed to get wallet information",
                     details: error.message
                 });

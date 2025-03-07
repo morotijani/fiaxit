@@ -69,54 +69,6 @@ class BitcoinController {
 		};
   	};
 
-  	/**
-   		* Send Bitcoin
-   	*/
-  	sendBitcoin = () => {
-		return async (req, res) => {
-			try {
-				const { privateKey, toAddress, amount, feeRate } = req.body;
-				const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-				
-				// Validate required fields
-				if (!privateKey || !toAddress || !amount) {
-					return res.status(400).json({
-						success: false,
-						error: "Missing required parameters: privateKey, toAddress, and amount are required"
-					});
-				}
-				
-				const result = await this.bitcoinService.sendBitcoin(
-					privateKey,
-					toAddress,
-					parseFloat(amount),
-					feeRate || 10,
-					isTestnet
-				);
-        
-				if (!result.success) {
-					return res.status(400).json({
-						success: false,
-						error: result.error,
-						details: result.details
-					});
-				}
-				
-				res.status(200).json({
-					success: true,
-					method: "sendBitcoin",
-					transaction: result
-				});
-			} catch (error) {
-				console.error("Bitcoin transfer error:", error);
-				res.status(500).json({
-					success: false,
-					error: "Failed to send Bitcoin",
-					details: error.message
-				});
-			}
-		};
-	};
 }
 
 module.exports = new BitcoinController();
