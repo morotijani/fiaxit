@@ -28,6 +28,20 @@ router.post('/signup', UserController.signup()); // Register users
 */
 router.post('/login', UserController.login()); // login user
 
+// Usage (example): PATCH /api/v1/update/:id
+/** body
+ * {
+        "fname": "",
+        "mname": "", // not compulsory
+        "lname": "",
+        "email": "",
+        "phone": "",
+        "password": "",
+        "confirm_password": "", 
+        "pin": "",
+        "invitationcode": "" // not compulsory
+    }
+*/
 router.patch('/update/:id', userAuth, UserController.update()); // update user
 
 // Usage (example): GET /api/v1/loggedInUser

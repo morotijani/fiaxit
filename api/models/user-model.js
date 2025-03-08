@@ -100,8 +100,11 @@ User.beforeCreate(async (user, options) => { // pass user object in this functio
 User.beforeSave(async (user, options) => {
     if (user.updatePassword) {
         const hashed = await bcrypt.hash(user.user_password, 10)
-        const pinHashed = await bcrypt.hash(user.user_pin, 10)
         user.user_password = hashed
+    }
+
+    if (user.updatePin) {
+        const pinHashed = await bcrypt.hash(user.user_pin, 10)
         user.user_pin = pinHashed
     }
 })

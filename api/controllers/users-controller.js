@@ -138,7 +138,11 @@ class UsersController {
                 user.email = req.body.email
                 if (req.body.password) {
                     user.updatePassword = true
-                    user.password = req.body.password
+                    user.user_password = req.body.password
+                }
+                if (req.body.pin) {
+                    user.updatePin = true;
+                    user.user_pin = req.body.pin
                 }
                 await user.save();
                 await user.reload();
