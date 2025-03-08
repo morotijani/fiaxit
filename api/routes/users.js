@@ -48,7 +48,6 @@ router.patch('/update/:id', userAuth.authenticate, UserController.update()); // 
 router.get('/loggedInUser', userAuth.authenticate, UserController.loggedInUser()); // logged in user
 
 // Usage (example): GET /api/v1/logout
-// Logout route - authenticate middleware adds token to req.token
-router.get('/logout', userAuth.authenticate, UserController.logout());
+router.get('/logout', userAuth.authenticate, UserController.logout()); // Logout route - authenticate middleware adds token to req.token
 
 module.exports = router;

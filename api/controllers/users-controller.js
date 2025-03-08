@@ -241,20 +241,11 @@ class UsersController {
                     user: null, 
                     msg: "User not found."
                 }
-                const token = req.token;
-                const decoded = await jwt.verify(token, process.env.JWT_KEY);
-                const user = await User.findOne({ // get user
-                    where: {
-                        user_id : decoded.user_id
-                    }
-                })
+            
+                const user = req.userData
+                const data = user
+                delete data.user_password; // remove password from user data for security reasons
 
-                if (!user) {
-                    return res.status(401).json(resp);
-                }
-
-                const data = user.toJSON()
-                delete data.user_password; //
                 resp.success = true;
                 resp.method =  "loggedInUser";
                 resp.user = data;

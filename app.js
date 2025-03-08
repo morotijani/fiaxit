@@ -9,7 +9,6 @@ const walletRoutes = require('./api/routes/wallets')
 const morgan = require('morgan') // HTTP request logger middleware for node.js
 const bodyParser = require('body-parser')
 const { authenticate } = require('./api/middleware/check-auth');
-userAuth = authenticate;
 app.use(morgan('dev'));
 
 // any request pass through and handle urlencoded
@@ -32,8 +31,8 @@ app.use((req, res, next) => {
 app.use('/v1/contacts', contactRoutes)
 app.use('/v1/todos', todoRoutes)
 app.use('/v1/users', userRoutes)
-app.use('/v1/wallets', userAuth, walletRoutes)
-app.use('/v1/transactions', userAuth, transactionRoutes)
+app.use('/v1/wallets', authenticate, walletRoutes)
+app.use('/v1/transactions', authenticate, transactionRoutes)
 
 // Error handling
 app.use((req, res, next) => {

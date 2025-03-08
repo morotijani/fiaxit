@@ -148,12 +148,13 @@ class USDTController {
                         details: walletInfo.details
                     });
                 }
-                
+            
                 res.status(200).json({
                     success: true,
                     method: "getUSDTWalletInfo",
                     data: walletInfo
                 });
+                
             } catch (error) {
                 console.error("Wallet info error:", error);
                 res.status(500).json({

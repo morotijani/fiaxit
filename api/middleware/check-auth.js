@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const redis = require("redis");
+const User = require('../models/user-model');
 
 // Create Redis client
 const redisClient = redis.createClient({
@@ -43,6 +44,21 @@ const authenticate = async(req, res, next) => {
 
         // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_KEY);
+
+        const user = await User.findOne({ // get user
+            where: {
+                user_id : decoded.user_id
+            }
+        })
+
+        if (!user) {
+            return res.status(401).json({
+                success: false, 
+                method: "authentication", 
+                message: "Authentication failed: User not found."
+            });
+        }
+        //return user;
         
         // Attach user data to request
         req.userData = decoded;
