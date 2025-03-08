@@ -7,6 +7,30 @@ class UsersController {
     signup = () => {
         return async (req, res, next) => {
             const userId = uuidv4();
+
+            // check if email is a valid email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(req.body.email)) {
+                return res.status(422).json({
+                    success: false, 
+                    method: "registerUser",
+                    path: "email",
+                    message: "Please enter a valid email address."
+                });
+            }
+
+            // check for password length and characters
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
+            if (!passwordRegex.test(req.body.password)) {
+                return res.status(422).json({
+                    success: false, 
+                    method: "registerUser",
+                    path: "password",
+                    message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                });
+            }
+
+            // check if password and confirm password is equal
             if (req.body.password !== req.body.confirm_password) {
                 return res.status(422).json([
                     {
@@ -20,16 +44,31 @@ class UsersController {
                 ])
             }
 
+            // check if pin is number and its length is 4
+            if (isNaN(req.body.pin) || req.body.pin.toString().length !== 4) {
+                return res.status(422).json({
+                    success: false, 
+                    method: "registerUser",
+                    path: "pin",
+                    message: "PIN must be a 4-digit number."
+                });
+            }
+
             try {
                 const user = await User.create({
                     user_id: userId,
-                    fname: req.body.fname,
-                    lname: req.body.lname,
-                    email: req.body.email,
-                    password: req.body.password
+                    user_fname: req.body.fname,
+                    user_mname: req.body.mname || null, // if middle name is not provided, set to null
+                    user_lname: req.body.lname,
+                    user_email: req.body.email,
+                    user_phone: req.body.phone || null, // if phone is not provided, set to null
+                    user_password: req.body.password, 
+                    user_pin: req.body.pin, 
+                    user_invitationcode: req.body.invitationcode || null // if invitation code is not provided, set to null
                 })
                 res.status(200).json({
                     success: true,
+                    method: "registerUser", 
                     user: user
                 })
             } catch(err) {
@@ -51,15 +90,15 @@ class UsersController {
                     message: msg
                 }
             ]
-            const resp = {success: false, errors: errors}
+            const resp = {success: false, method: "login", errors: errors}
             const user = await User.findOne({
                 where: {
-                    email: req.body.email
+                    user_email: req.body.email
                 }
             })
             const password = req.body.password
             if (user) {
-                const passed = await bcrypt.compare(password, user.password)
+                const passed = await bcrypt.compare(password, user.user_password)
                 if (passed) {
                     const signVals = user.toJSON(); //
                     delete signVals.password // remove password from the signvals
@@ -67,6 +106,7 @@ class UsersController {
                         expiresIn: "30d"
                     });
                     resp.success = true;
+                    resp.method = "login";
                     resp.errors = [];
                     resp.token = token
                 }
@@ -113,6 +153,7 @@ class UsersController {
         return async (req, res, next) => {
             const resp = {
                 success: false, 
+                method: "loggedInUser", 
                 user: null, 
                 msg: "User not found."
             }
@@ -124,8 +165,9 @@ class UsersController {
                 }
             })
             const data = user.toJSON()
-            delete data.password; //
+            delete data.user_password; //
             resp.success = true;
+            resp.method =  "loggedInUser";
             resp.user = data;
             resp.msg = "User is logged in.";
 

@@ -6,36 +6,8 @@ class USDTController {
     }
 
     /**
-     * Generate a new Ethereum wallet
-     */
-    // generateWallet = () => {
-    //     return async (req, res) => {
-    //         try {
-    //             const wallet = this.usdtService.generateWallet();
-                
-    //             res.status(201).json({
-    //                 success: true,
-    //                 method: "generateWallet",
-    //                 wallet: {
-    //                     address: wallet.address,
-    //                     privateKey: wallet.privateKey,
-    //                     mnemonic: wallet.mnemonic
-    //                 }
-    //             });
-    //         } catch (error) {
-    //             console.error("Wallet generation error:", error);
-    //             res.status(500).json({
-    //                 success: false,
-    //                 error: "Failed to generate wallet",
-    //                 details: error.message
-    //             });
-    //         }
-    //     };
-    // };
-
-    /**
-     * Get USDT balance for an address
-     */
+        * Get USDT balance for an address
+    */
     getBalance = () => {
         return async (req, res) => {
             try {
@@ -77,8 +49,8 @@ class USDTController {
     };
 
     /**
-     * Send USDT from one address to another
-     */
+        * Send USDT from one address to another
+    */
     sendUSDT = () => {
         return async (req, res) => {
             try {
@@ -152,8 +124,8 @@ class USDTController {
 
 
     /**
-     * Get detailed wallet information
-     */
+        * Get detailed wallet information
+    */
     getWalletInfo = () => {
         return async (req, res) => {
             try {

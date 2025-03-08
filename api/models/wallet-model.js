@@ -56,7 +56,8 @@ const Wallet = mysql.define('fiaxit_wallets', {
     indexes: [
         {fields: ['wallet_id']},
         {fields: ['wallet_for']},
-        {fields: ['wallet_crypto']},
+        {fields: ['wallet_crypto']}, 
+        {fields: ['createdAt']}, 
         {fields: ['wallet_status']}
     ],
     timestamps: true, // Enable timestamps

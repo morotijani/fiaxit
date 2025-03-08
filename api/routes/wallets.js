@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const WalletsController = require("../controllers/wallet-controller");
-const USDTController = require('../controllers/usdt-controller');
+const USDTController = require('../middleware/usdt-controller');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 // Usage (example): GET /api/v1/wallets
