@@ -32,14 +32,14 @@ router.post('/login', UserController.login()); // login user
 /** body
  * {
         "fname": "",
-        "mname": "", // not compulsory
+        "mname": "",
         "lname": "",
         "email": "",
         "phone": "",
         "password": "",
         "confirm_password": "", 
         "pin": "",
-        "invitationcode": "" // not compulsory
+        "invitationcode": ""
     }
 */
 router.patch('/update/:id', userAuth, UserController.update()); // update user

@@ -117,39 +117,56 @@ class UsersController {
 
     update = () => {
         return async (req, res, next) => {
-            const resp = {
-                success: false, 
-                user: null
-            };
-            const userId = req.params.id;
-            // check to see if user is updating not him/herself
-            if (userId != req.userData.user_id) {
-                return res.status(401).json({msg: "You do not have permission to update this user."})
+            try {
+                const resp = {
+                    success: false, 
+                    user: null
+                };
+                const userId = req.params.id;
+                // check to see if user is updating not him/herself
+                if (userId != req.userData.user_id) {
+                    return res.status(401).json({
+                        success: false, 
+                        method: "updateUser", 
+                        msg: "You do not have permission to update this user."
+                    })
+                }
+                const user = await User.findOne({
+                    where: {
+                        user_id: userId
+                    }
+                })
+                // const user = await User.findByPk(userId) // find by using primary key
+                if (user) {
+                    user.user_fname = req.body.fname || user.user_fname
+                    user.user_mname = req.body.mname || user.user_mname
+                    user.user_lname = req.body.lname || user.user_lname
+                    user.user_email = req.body.email || user.user_email 
+                    user.user_phone = req.body.phone || user.user_phone
+                    if (req.body.password) {
+                        user.updatePassword = true
+                        user.user_password = req.body.password
+                    }
+                    if (req.body.pin) {
+                        user.updatePin = true;
+                        user.user_pin = req.body.pin
+                    }
+                    user.user_invitationcode = req.body.invitationcode || user.user_invitationcode
+                    await user.save();
+                    await user.reload();
+                    resp.success = true;
+                    resp.method = "updateUser";
+                    resp.user = user
+                }
+                res.status(200).json(resp)
+            } catch (err) {
+                return res.status(401).json({
+                    success: false, 
+                    method: 'updateUser', 
+                    msg: "An error occured on updating user", 
+                    details: err.message
+                })
             }
-            const user = await User.findOne({
-                where: {
-                    user_id: userId
-                }
-            })
-            // const user = await User.findByPk(userId) // find by using primary key
-            if (user) {
-                user.fname = req.body.fname
-                user.lname = req.body.lname
-                user.email = req.body.email
-                if (req.body.password) {
-                    user.updatePassword = true
-                    user.user_password = req.body.password
-                }
-                if (req.body.pin) {
-                    user.updatePin = true;
-                    user.user_pin = req.body.pin
-                }
-                await user.save();
-                await user.reload();
-                resp.success = true;
-                resp.user = user
-            }
-            res.status(200).json(resp)
         }
     }
 
