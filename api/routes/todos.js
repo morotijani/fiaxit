@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const TodosController = require('../controllers/todos-controller');
-const userAuth = require("../middleware/check-auth");
+const { authenticate } = require("../middleware/check-auth");
+userAuth = authenticate;
 
 router.get('/', userAuth, TodosController.getAll());
 

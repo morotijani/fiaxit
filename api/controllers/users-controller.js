@@ -2,6 +2,7 @@ const User = require('../models/user-model');
 const { v4: uuidv4 } = require('uuid')
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken')
+const { blacklistToken } = require('../middleware/check-auth');
 
 class UsersController {
     signup = () => {
@@ -79,41 +80,102 @@ class UsersController {
 
     login = () => {
         return async (req, res, next) => {
-            const msg = "Something is wrong with your email or password";
-            const errors = [
-                {
-                    path: "password",
-                    message: msg,
-                }, 
-                {
-                    path: "email",
-                    message: msg
+            try {
+                const msg = "Something is wrong with your email or password";
+                const errors = [
+                    {
+                        path: "password",
+                        message: msg,
+                    }, 
+                    {
+                        path: "email",
+                        message: msg
+                    }
+                ]
+                const resp = {success: false, method: "login", errors: errors}
+                const user = await User.findOne({
+                    where: {
+                        user_email: req.body.email
+                    }
+                })
+                const password = req.body.password
+                if (user) {
+                    const passed = await bcrypt.compare(password, user.user_password)
+                    if (passed) {
+                        const signVals = user.toJSON(); //
+                        delete signVals.password // remove password from the signvals
+                        const token = await jwt.sign(signVals, process.env.JWT_KEY, {
+                            expiresIn: "30d"
+                        });
+                        resp.success = true;
+                        resp.method = "login";
+                        resp.errors = [];
+                        resp.token = token
+                    }
+                } else {
+                    res.status(401).json({
+                        success: false,
+                        method: "login",
+                        message: "User not found."
+                    })
                 }
-            ]
-            const resp = {success: false, method: "login", errors: errors}
-            const user = await User.findOne({
-                where: {
-                    user_email: req.body.email
-                }
-            })
-            const password = req.body.password
-            if (user) {
-                const passed = await bcrypt.compare(password, user.user_password)
-                if (passed) {
-                    const signVals = user.toJSON(); //
-                    delete signVals.password // remove password from the signvals
-                    const token = await jwt.sign(signVals, process.env.JWT_KEY, {
-                        expiresIn: "30d"
-                    });
-                    resp.success = true;
-                    resp.method = "login";
-                    resp.errors = [];
-                    resp.token = token
-                }
+                res.status(200).json(resp)
+            } catch(error) {
+                res.status(500).json({
+                    success: false, 
+                    method: "login", 
+                    message: "An error occurred while logging in the user.", 
+                    error: error.message
+                });
             }
-            res.status(200).json(resp)
         }
     }
+
+    logout = () => {
+        return async (req, res, next) => {
+            try {
+                const token = req.token;
+
+                //const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : "";
+                
+                console.log(token);
+                if (!token) {
+                    return res.status(401).json({
+                        success: false, 
+                        method: "logout", 
+                        message: "Logout failed: No authentication token provided."
+                    });
+                }
+                return;
+
+                const blacklisted = await blacklistToken(token);
+                
+                if (blacklisted) {
+                    res.status(200).json({
+                        success: true, 
+                        method: "logout", 
+                        message: "Logout successful: Token blacklisted. User has been logged out."       
+                    });
+                } else {
+                    res.status(400).json({
+                        success: false, 
+                        method: "logout",
+                        message: "Logout failed (Could not blacklist token): An error occurred while logging out the user.",
+                        error: error.message
+                    });
+                }
+            } catch(error) {
+                res.status(500).json({
+                    success: false, 
+                    method: "logout",
+                    message: "Logout failed: An error occurred while logging out the user.",
+                    error: error.message
+                });
+            }
+        }
+    }
+
+
 
     update = () => {
         return async (req, res, next) => {
@@ -172,27 +234,41 @@ class UsersController {
 
     loggedInUser = () => {
         return async (req, res, next) => {
-            const resp = {
-                success: false, 
-                method: "loggedInUser", 
-                user: null, 
-                msg: "User not found."
-            }
-            const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : "";
-            const decoded = await jwt.verify(token, process.env.JWT_KEY);
-            const user = await User.findOne({ // get user
-                where: {
-                    user_id : decoded.user_id
+            try {
+                const resp = {
+                    success: false, 
+                    method: "loggedInUser", 
+                    user: null, 
+                    msg: "User not found."
                 }
-            })
-            const data = user.toJSON()
-            delete data.user_password; //
-            resp.success = true;
-            resp.method =  "loggedInUser";
-            resp.user = data;
-            resp.msg = "User is logged in.";
+                const token = req.token;
+                const decoded = await jwt.verify(token, process.env.JWT_KEY);
+                const user = await User.findOne({ // get user
+                    where: {
+                        user_id : decoded.user_id
+                    }
+                })
 
-            res.status(200).json(resp);
+                if (!user) {
+                    return res.status(401).json(resp);
+                }
+
+                const data = user.toJSON()
+                delete data.user_password; //
+                resp.success = true;
+                resp.method =  "loggedInUser";
+                resp.user = data;
+                resp.msg = "User is logged in.";
+
+                res.status(200).json(resp);
+            } catch(error) {
+                res.status(401).json({
+                    success: false, 
+                    method: "loggedInUser", 
+                    message: "An error occurred while fetching logged in user.", 
+                    error: error.message
+                });
+            }
         }
     }
 

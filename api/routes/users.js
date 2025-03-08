@@ -42,9 +42,13 @@ router.post('/login', UserController.login()); // login user
         "invitationcode": ""
     }
 */
-router.patch('/update/:id', userAuth, UserController.update()); // update user
+router.patch('/update/:id', userAuth.authenticate, UserController.update()); // update user
 
 // Usage (example): GET /api/v1/loggedInUser
-router.get('/loggedInUser', UserController.loggedInUser()); // logged in user
+router.get('/loggedInUser', userAuth.authenticate, UserController.loggedInUser()); // logged in user
+
+// Usage (example): GET /api/v1/logout
+// Logout route - authenticate middleware adds token to req.token
+router.get('/logout', userAuth.authenticate, UserController.logout());
 
 module.exports = router;

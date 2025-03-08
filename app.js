@@ -8,8 +8,8 @@ const transactionRoutes = require('./api/routes/transactions')
 const walletRoutes = require('./api/routes/wallets')
 const morgan = require('morgan') // HTTP request logger middleware for node.js
 const bodyParser = require('body-parser')
-const userAuth = require('./api/middleware/check-auth');
-
+const { authenticate } = require('./api/middleware/check-auth');
+userAuth = authenticate;
 app.use(morgan('dev'));
 
 // any request pass through and handle urlencoded

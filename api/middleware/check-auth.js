@@ -1,23 +1,105 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const redis = require("redis");
 
-module.exports = (req, res, next) => {
+// Create Redis client
+const redisClient = redis.createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379'
+});
+
+// Connect to redis
+// (async () => {
+//     try {
+//         await redisClient.connect();
+//         console.log("Connected to Redis");
+//     } catch(err) {
+//         console.error('Redis connection error:', err);
+//     }
+// })();
+
+const authenticate = async(req, res, next) => {
     try {
-        const token = req.headers.authorization ? req.headers.authorization.split(" ")[1] : "";
-        
-        if (!token) {
-            return res.status(401).json({ 
-                message: "Authentication failed: No token provided" 
+        // Get token from authorization header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false, 
+                method: "authentication", 
+                message: "Authentication required: No token provided."
             });
         }
-        
-        // jwt.verify is synchronous when no callback is provided
+
+        // Extract the token
+        const token = authHeader.split(' ')[1];
+
+        // Check if token is blacklisted
+        // const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+        // if (isBlacklisted) {
+        //     return res.status(401).json({
+        //         success: false, 
+        //         method: "authentication", 
+        //         message: "Authentication failed: Token blacklisted (Token has been revoked) Please login again."
+        //     });
+        // }
+
+        // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_KEY);
+        
+        // Attach user data to request
         req.userData = decoded;
+        req.token = token; // Store token for potential use in other middleware/controllers
+        
+        // Continue to the next middleware/router handler
         next();
-    } catch(err) {
-        return res.status(401).json({
-            message: "Authentication failed: Invalid token",
-            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    } catch(error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false, 
+                method: "authentication", 
+                message: "Authentication failed: Token expired. Please login again."
+            });
+        }
+
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false, 
+                method: "authentication", 
+                message: "Authentication failed: Invalid token. Please login again."
+            });
+        }
+
+        console.error('Authentication error:', error);
+        return res.status(500).json({
+            success: false, 
+            method: "authentication", 
+            message: 'Authentication failed: An error occurred while authenticating the user.', 
+            error: error.message
         });
     }
-}
+};
+
+// Function to blacklist a token (not middleware)
+const blacklistToken = async (token) => {
+    try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+            // Calculate remaining time until token expiry
+            const expiryTime = decoded.exp - Math.floor(Date.now() / 1000);
+
+            if (expiryTime > 0) {
+                // Store token in blacklist until its original expiration time
+                await redisClient.set(`blacklist:${token}`, 'true', {
+                    EX: expiryTime
+                });
+
+                console.log(`Token blacklisted for ${expiryTime} seconds`);
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error blacklisting token:', error);
+        return false;
+    }
+};
+
+module.exports = { authenticate, blacklistToken };

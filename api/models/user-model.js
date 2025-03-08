@@ -27,7 +27,7 @@ const User = mysql.define('fiaxit_users', {
     user_email: {
         type: DataTypes.STRING(155),
         allowNull: false, 
-        unique: true,
+        // unique: true,
         validate: {
             isEmail: {
                 msg: "Must be a valid email."
@@ -71,7 +71,7 @@ const User = mysql.define('fiaxit_users', {
 }, {
     indexes: [
         {fields: ['user_id']}, 
-        {fields: ['user_email']}, 
+        {unique: true, fields: ['user_email']}, 
         {fields: ['user_phone']}, 
         {fields: ['createdAt']}
     ], 
