@@ -10,14 +10,14 @@ router.get('/', WalletsController.getAll()) // get all wallet address
 // Usage (example): POST /api/v1/wallets/BTC/generate
 router.post('/:id/generate', WalletsController.generateWallet()); // generate wallet address
 
-// Usage (example): GET /api/v1/wallets/usdt/0x1234567890abcdef1234567890abcdef12345678/balance
+// Usage (example): GET /api/v1/wallets/usdt/:address/balance
 router.get('/usdt/:address/balance', USDTController.getBalance()); // get usdt balance
 router.get('/btc/:address/balance', BitcoinWalletService.getWalletBalance()); // get btc balance
 
-// Usage (example): GET /api/v1/wallets/usdt/0x1234567890abcdef1234567890abcdef12345678/info
+// Usage (example): GET /api/v1/wallets/usdt/:address/info
 router.get('/usdt/:address/info', USDTController.getWalletInfo()); // get usdt wallet info
 
-// Usage (example): GET /api/v1/wallets/btc/0x1234567890abcdef1234567890abcdef12345678/info
+// Usage (example): GET /api/v1/wallets/btc/:address/info
 router.get('/btc/:address/info', WalletsController.getWalletInfo()); // get btc wallet info
 
 // route grouping

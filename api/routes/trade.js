@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const WalletsController = require("../controllers/wallet-controller");
+const USDTController = require('../middleware/usdt-controller')
+const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const ethereumController = require('../middleware/ethereum-controller');
 
 // Routes
