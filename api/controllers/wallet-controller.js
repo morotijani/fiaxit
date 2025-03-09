@@ -6,6 +6,7 @@ const  Mnemonic = require('bitcore-mnemonic');
 const USDTService = require('../service/usdt-service');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const Bitcoin = require("../middleware/bitcoin-controller")
+const Ethereum = require("../middleware/ethereum-controller")
 
 class WalletsController {
 
@@ -130,7 +131,8 @@ class WalletsController {
                     }
                 } else if (crypto === 'ETH') {
                     // Ethereum wallet generation
-                    const wallet = await Ethereum.generateWallet();
+                    const wallet = Ethereum.generateWallet();
+                    wallet = await wallet();
                     walletXpub = null;
                     walletAddress = wallet.address;
                     walletPrivatekey = wallet.privateKey;
