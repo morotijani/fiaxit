@@ -3,6 +3,7 @@ const router = express.Router();
 const WalletsController = require("../controllers/wallet-controller");
 const USDTController = require('../middleware/usdt-controller');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
+const ethereumController = require('../middleware/ethereum-controller');
 
 // Usage (example): GET /api/v1/wallets
 router.get('/', WalletsController.getAll()) // get all wallet address
@@ -25,13 +26,11 @@ router.route('/:id')
     .get(WalletsController.findById()) // get wallet address by id
     .delete(WalletsController.delete()); // delete wallet address
 
-// Usage (example): POST /api/v1/wallets/usdt/send 
-// {
-//     "senderPrivateKey": "",
-//     "receiverAddress": "",
-//     "amount": "",
-//     "isTestnet": true or false for mainnet
-// }
-router.post('/usdt/send', USDTController.sendUSDT()); // send usdt
+
+// ETH
+router.post('/ETH/generate', WalletsController.generateWallet());
+router.get('/eth/:address/balance', ethereumController.getWalletBalance);
+router.get('/eth/:address/info', ethereumController.getWalletInfo);
+router.get('/eth/:address/validate', ethereumController.validateAddress);
 
 module.exports = router;

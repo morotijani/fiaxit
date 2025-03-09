@@ -104,25 +104,6 @@ class WalletsController {
                     walletAddress = wallet.address
                     walletPrivatekey = wallet.privateKey // For development only
                     walletMnemonic = wallet.mnemonic; // For development only
-                                
-                    // Use testnet for development, mainnet for production
-                    // const network = process.env.NODE_ENV === 'production' ? Networks.mainnet : Networks.testnet;
-                    
-                    // // Create a single HD wallet
-                    // const passPhrase = new Mnemonic(Mnemonic.Words.SPANISH);
-                    // const xpriv = passPhrase.toHDPrivateKey(passPhrase.toString(), network);
-                    
-                    // // Store only public information in database
-                    // walletXpub = xpriv.xpubkey;
-                    // walletAddress = xpriv.publicKey.toAddress().toString();
-                    // walletPrivatekey = xpriv.privateKey.toString(); // For development only
-                    // walletMnemonic = passPhrase.toString(); // For development only
-
-                    // encrypt privateKey and passPhrase
-                    // encryptedData = {
-                    //     privateKey: xpriv.privateKey.toString(),
-                    //     mnemonic: passPhrase.toString()
-                    // }
                     
                     // For development only - log sensitive data (REMOVE IN PRODUCTION)
                     // if (process.env.NODE_ENV !== 'production') {
@@ -130,9 +111,6 @@ class WalletsController {
                     //     console.log('Private Key:', xpriv.privateKey.toString());
                     //     console.log('Mnemonic:', passPhrase.toString());
                     // }
-                    
-                    // In a real application, you might encrypt sensitive data with a user-provided key
-                    // or use a secure vault service instead of storing in your database
                 } else if (crypto === 'USDT') {
                     try {
                         const wallet = this.usdtService.generateWallet();
@@ -150,6 +128,14 @@ class WalletsController {
                             details: error.message
                         });
                     }
+                } else if (crypto === 'ETH') {
+                    // Ethereum wallet generation
+                    const wallet = await Ethereum.generateWallet();
+                    walletXpub = null;
+                    walletAddress = wallet.address;
+                    walletPrivatekey = wallet.privateKey;
+                    walletMnemonic = wallet.mnemonic;
+                    console.log("ETH Wallet generated:", wallet);
                 } else {
                     return res.status(400).json({
                         success: false,

@@ -6,6 +6,7 @@ const todoRoutes = require('./api/routes/todos')
 const userRoutes = require('./api/routes/users')
 const transactionRoutes = require('./api/routes/transactions')
 const walletRoutes = require('./api/routes/wallets')
+const tradeRoutes = require('./api/routes/trade')
 const morgan = require('morgan') // HTTP request logger middleware for node.js
 const bodyParser = require('body-parser')
 const { authenticate } = require('./api/middleware/check-auth');
@@ -33,6 +34,7 @@ app.use('/v1/todos', todoRoutes)
 app.use('/v1/users', userRoutes)
 app.use('/v1/wallets', authenticate, walletRoutes)
 app.use('/v1/transactions', authenticate, transactionRoutes)
+app.use('/v1/trade', authenticate, tradeRoutes)
 
 // Error handling
 app.use((req, res, next) => {
