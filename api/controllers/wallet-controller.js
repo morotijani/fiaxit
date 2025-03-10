@@ -4,9 +4,10 @@ const bitcore = require('bitcore-lib');
 const { PrivateKey, Networks } = bitcore;
 const  Mnemonic = require('bitcore-mnemonic');
 const USDTService = require('../service/usdt-service');
-const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const Bitcoin = require("../middleware/bitcoin-controller")
 const Ethereum = require("../middleware/ethereum-controller")
+const ethereumService = require('../service/ethereum-wallet-service'); // Import the service directly
+const { net } = require("web3");
 
 class WalletsController {
 
@@ -84,6 +85,8 @@ class WalletsController {
     generateWallet = () => {
         return async (req, res, next) => {
             try {
+                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+                
                 const crypto = req.params.id;
                 const userId = req.userData.user_id;
                 const walletId = uuidv4();
@@ -96,22 +99,29 @@ class WalletsController {
                 let walletMnemonic = null;
                 
                 if (crypto === 'BTC') {
-
-                    const walletResponse = await Bitcoin.generateWallet(true);
-                    const wallet = walletResponse.wallet;
-                    console.log('Generated wallet:', wallet);
-                    
-                    walletXpub = null;
-                    walletAddress = wallet.address
-                    walletPrivatekey = wallet.privateKey // For development only
-                    walletMnemonic = wallet.mnemonic; // For development only
-                    
-                    // For development only - log sensitive data (REMOVE IN PRODUCTION)
-                    // if (process.env.NODE_ENV !== 'production') {
-                    //     console.log('DEVELOPMENT MODE - Sensitive wallet data:');
-                    //     console.log('Private Key:', xpriv.privateKey.toString());
-                    //     console.log('Mnemonic:', passPhrase.toString());
-                    // }
+                    try {
+                        const walletResponse = await Bitcoin.generateWallet(isTestnet);
+                        const wallet = walletResponse.wallet;
+                        console.log('Generated wallet:', wallet);
+                        
+                        walletXpub = null;
+                        walletAddress = wallet.address
+                        walletPrivatekey = wallet.privateKey // For development only
+                        walletMnemonic = wallet.mnemonic; // For development only
+                        
+                        // For development only - log sensitive data (REMOVE IN PRODUCTION)
+                        // if (process.env.NODE_ENV !== 'production') {
+                        //     console.log('DEVELOPMENT MODE - Sensitive wallet data:');
+                        //     console.log('Private Key:', xpriv.privateKey.toString());
+                        //     console.log('Mnemonic:', passPhrase.toString());
+                        // }
+                    } catch (error)  {
+                        return res.status(500).json({
+                            success: false, 
+                            error: "Failed to generate Bitcoin wallet", 
+                            details: error.message
+                        })
+                    }
                 } else if (crypto === 'USDT') {
                     try {
                         const wallet = this.usdtService.generateWallet();
@@ -125,23 +135,44 @@ class WalletsController {
                         console.error("USDT Wallet generation error:", error);
                         res.status(500).json({
                             success: false,
-                            error: "Failed to generate wallet",
+                            error: "Failed to generate USDT wallet",
                             details: error.message
                         });
                     }
                 } else if (crypto === 'ETH') {
                     // Ethereum wallet generation
-                    const wallet = Ethereum.generateWallet();
-                    wallet = await wallet();
-                    walletXpub = null;
-                    walletAddress = wallet.address;
-                    walletPrivatekey = wallet.privateKey;
-                    walletMnemonic = wallet.mnemonic;
-                    console.log("ETH Wallet generated:", wallet);
+                    try {
+			            // Check if a specific network was requested
+                        const network = ((isTestnet) ? 'sepolia' : req.query.network);
+                        if (network) {
+                            ethereumService.setNetwork(network);
+                        } else {
+                            return res.status(400).json({
+                                success: false,
+                                error: "Network is required for Ethereum wallet generation"
+                            });
+                        }
+
+                        const wallet = ethereumService.generateWallet();
+                        
+                        walletAddress = wallet.address;
+                        walletPrivatekey = wallet.privateKey;
+                        walletMnemonic = wallet.mnemonic;
+                        
+                        console.log("Generated ETH wallet:", wallet);
+                    } catch (error) {
+                        console.error("ETH Wallet generation error:", error);
+                        res.status(500).json({
+                            success: false,
+                            error: "Failed to generate Ethereum wallet", 
+                            details: error.message
+                        });
+                    }
+                    
                 } else {
                     return res.status(400).json({
                         success: false,
-                        method: "createAndGenerateWallet",
+                        method: "createAndGenerate" + crypto +"Wallet",
                         error: "Invalid crypto currency provided"
                     });
                 }

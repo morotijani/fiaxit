@@ -5,7 +5,7 @@ const USDTController = require('../middleware/usdt-controller');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const ethereumController = require('../middleware/ethereum-controller');
 
-// Usage (example): POST /api/v1/wallets/BTC/generate
+// Usage (example): POST /api/v1/wallets/BTC/generate?testnet=true(default is true) | (on ETH you can provide your network eg: ?network=networkname)
 router.post('/:id/generate', WalletsController.generateWallet()); // generate wallet address
 
 
