@@ -4,18 +4,27 @@ const User = require('../models/user-model');
 
 // Create Redis client
 const redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
+    // url: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
+    url: 'redis://127.0.0.1:6379'
 });
 
 // Connect to redis
-// (async () => {
-//     try {
-//         await redisClient.connect();
-//         console.log("Connected to Redis");
-//     } catch(err) {
-//         console.error('Redis connection error:', err);
-//     }
-// })();
+(async () => {
+    try {
+        await redisClient.on('error', (err) => {
+            console.error("Redis Client error", err);
+        })
+
+        await redisClient.on('ready', () => {
+            comsole.log("Redis Clent started")
+        })
+
+        await redisClient.connect();
+        console.log("Connected to Redis");
+    } catch(err) {
+        console.error('Redis connection error:', err);
+    }
+})();
 
 const authenticate = async(req, res, next) => {
     try {
@@ -33,14 +42,14 @@ const authenticate = async(req, res, next) => {
         const token = authHeader.split(' ')[1];
 
         // Check if token is blacklisted
-        // const isBlacklisted = await redisClient.get(`blacklist:${token}`);
-        // if (isBlacklisted) {
-        //     return res.status(401).json({
-        //         success: false, 
-        //         method: "authentication", 
-        //         message: "Authentication failed: Token blacklisted (Token has been revoked) Please login again."
-        //     });
-        // }
+        const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+        if (isBlacklisted) {
+            return res.status(401).json({
+                success: false, 
+                method: "authentication", 
+                message: "Authentication failed: Token blacklisted (Token has been revoked) Please login again."
+            });
+        }
 
         // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_KEY);
@@ -103,14 +112,18 @@ const blacklistToken = async (token) => {
 
             if (expiryTime > 0) {
                 // Store token in blacklist until its original expiration time
-                await redisClient.set(`blacklist:${token}`, 'true', {
+                const rediz = await redisClient.set(`blacklist:${token}`, 'true', {
                     EX: expiryTime
                 });
+                if (!rediz) {
+                    console.log('redis problem');
+                }
 
                 console.log(`Token blacklisted for ${expiryTime} seconds`);
                 return true;
             }
         }
+        console.error('Error blacklisting token:', error);
         return false;
     } catch (error) {
         console.error('Error blacklisting token:', error);

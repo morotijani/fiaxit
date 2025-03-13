@@ -134,11 +134,7 @@ class UsersController {
     logout = () => {
         return async (req, res, next) => {
             try {
-                const token = req.token;
-
-                //const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : "";
-                
-                console.log(token);
+                const token = req.token;                
                 if (!token) {
                     return res.status(401).json({
                         success: false, 
@@ -146,10 +142,8 @@ class UsersController {
                         message: "Logout failed: No authentication token provided."
                     });
                 }
-                return;
 
                 const blacklisted = await blacklistToken(token);
-                
                 if (blacklisted) {
                     res.status(200).json({
                         success: true, 
