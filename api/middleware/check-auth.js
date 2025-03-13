@@ -16,7 +16,7 @@ const redisClient = redis.createClient({
         })
 
         await redisClient.on('ready', () => {
-            comsole.log("Redis Clent started")
+            console.log("Redis Client started")
         })
 
         await redisClient.connect();
