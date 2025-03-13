@@ -2,44 +2,9 @@ const Transaction = require("../models/transaction-model");
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const Bitcoin = require("../middleware/bitcoin-controller")
+const EthereumWalletService = require('../service/ethereum-wallet-service')
 
 class TransactionsController {
-
-    sbtc = () => {
-        return async (req, res, next) => {
-            try {
-                const { privateKey,
-                    toAddress,
-                    amount,
-                    feeRate } = req.body;
-                const tt = req.query.tt;
-
-                // Validate required parameters
-                if (!privateKey || !toAddress || !amount || !feeRate) {
-                    return res.status(400).json({
-                        success: false,
-                        message: "Missing required parameters"
-                    });
-                }
-
-                const result = Bitcoin.sendBitcoin(privateKey,
-                    toAddress,
-                    amount,
-                    feeRate );
-                await result(req, res)
-                // res.status(200).json({
-                //     success: true,
-                //     data: result
-                // });
-            } catch (error) {
-                console.error("Bitcoin send error:", error);
-                res.status(500).json({
-                    success: false,
-                    error: error.message || "Failed to send Bitcoin"
-                });
-            }
-        }
-    }
 
     // get all method
     getAll = () => {
@@ -99,7 +64,7 @@ class TransactionsController {
                 const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
 
                 // validate required fields
-                const requiredFields = ['amount', 'crypto_id', 'toAddress', 'privateKey'];
+                const requiredFields = ['amount', 'crypto_id', 'receiverAddress', 'senderPrivateKey'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
@@ -113,21 +78,21 @@ class TransactionsController {
                 const transactionId = uuidv4();
                 const transactionStatus = 1;
                 const cryptoSymbol = req.body.crypto_symbol
-                const transactionAmount = req.body.amount;
-                const privateKey = req.body.privateKey
-                const receiverWalletAddress = req.body.toAddress 
+                const amount = req.body.amount;
+                const senderPrivateKey = req.body.senderPrivateKey
+                const receiverWalletAddress = req.body.receiverAddress 
                 const feeRate = req.body.feeRate || 10 //0.0001
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
-                        privateKey, 
+                        senderPrivateKey, 
                         receiverWalletAddress, 
-                        transactionAmount, 
+                        amount, 
                         feeRate, 
                         isTestnet 
                     );
                     
                     if (result.txid) {
-                        console.log('Transaction sent successfully:', result.txid);
+                        console.log('Bitcoin Transaction sent successfully:', result.txid);
                         console.log('result:', result);
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
@@ -139,14 +104,38 @@ class TransactionsController {
                             details: result.details
                         });
                     }
-                } else if (cryptoSymbol === 'USDT') {}
+                } else if (cryptoSymbol === 'USDT') {
+
+                } else if (cryptoSymbol === 'ETH') {
+                    result = await EthereumWalletService.sendEther(senderPrivateKey, receiverWalletAddress, amount)
+                    const speedTransaction = null;
+                    if (speedTransaction) {
+                        const higherFee = 1.5 // 50% higher fee
+                        // First get the nonce of the pending transaction
+                        const pendingNonce = 42; // You need to know this value
+
+                        // Then speed it up with a 50% higher fee
+                        result = await walletService.speedUpTransaction(
+                            senderPrivateKey, 
+                            pendingNonce, 
+                            receiverWalletAddress, 
+                            amount, 
+                            higherFee
+                        );
+
+                    }
+                    if (result.txHash) {
+                        console.log('Ethereum Transaction send successfully:', result.txHash)
+                        console.log('result:', result)
+                    }
+                }
 
                 if (result && result.txid) {
                     const transaction = await Transaction.create({
                         transaction_id: transactionId, 
                         transaction_hash_id: result.txid,
                         transaction_by: userId, 
-                        transaction_amount: transactionAmount, 
+                        transaction_amount: amount, 
                         transaction_crypto_id: req.body.crypto_id, 
                         transaction_crypto_symbol: cryptoSymbol, 
                         transaction_crypto_name: req.body.crypto_name, 
@@ -160,7 +149,8 @@ class TransactionsController {
                     res.status(201).json({
                         success: true,
                         method: "createAndSend" + cryptoSymbol, 
-                        transaction: transaction
+                        transaction: transaction, 
+                        crypto_result: result
                     });
                 }
             } catch(err) {

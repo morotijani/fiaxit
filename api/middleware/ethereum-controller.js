@@ -6,6 +6,35 @@ class EthereumController {
 	 	* @param {Object} req - Express request object
 	 	* @param {Object} res - Express response object
 	*/
+	generateWallet = (req, res) => {
+		try {
+			// Check if a specific network was requested
+			const network = req.query.network || 'sepolia';
+			
+			// Set the network if specified
+			if (network) {
+				ethereumService.setNetwork(network);
+			}
+			
+			// Generate a new wallet
+			const wallet = ethereumService.generateWallet();
+			
+			res.status(200).json({
+				success: true,
+				method: "generateWallet",
+				data: {
+					...wallet, // Spread syntax in action!
+					network
+				}
+      		});
+		} catch (error) {
+			console.error("Wallet generation error:", error);
+			res.status(500).json({
+				success: false,
+				error: error.message || "Failed to generate Ethereum wallet"
+			});
+		}
+	}
 
 	/**
 		* Get wallet balance
@@ -66,8 +95,8 @@ class EthereumController {
 			
 			if (!walletAddress) {
 				return res.status(400).json({
-				success: false,
-				error: "Wallet address is required"
+					success: false,
+					error: "Wallet address is required"
 				});
 			}
 			
@@ -79,8 +108,8 @@ class EthereumController {
 			// Validate Ethereum address format
 			if (!ethereumService.isValidEthereumAddress(walletAddress)) {
 				return res.status(400).json({
-				success: false,
-				error: "Invalid Ethereum address format"
+					success: false,
+					error: "Invalid Ethereum address format"
 				});
 			}
 			
@@ -145,9 +174,9 @@ class EthereumController {
 			
 			if (result.error) {
 				return res.status(422).json({
-				success: false,
-				error: result.error,
-				details: result.details
+					success: false,
+					error: result.error,
+					details: result.details
 				});
 			}
 			

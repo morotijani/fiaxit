@@ -7,7 +7,7 @@ class EthereumWalletService {
 		this.currentNetwork = 'sepolia';
 		
 		// Your Alchemy API key
-		const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY //|| 'demo'; // Fallback to demo if not set
+		const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
 		
 		// Define network configurations with your API key
 		this.networks = {
@@ -47,9 +47,9 @@ class EthereumWalletService {
 	}
 
 	/**
-	 * Initialize the JSON-RPC provider with explicit network configuration
-	 * @param {string} networkName - Network name
-	 */
+	 	* Initialize the JSON-RPC provider with explicit network configuration
+	 	* @param {string} networkName - Network name
+	*/
 	initializeProvider(networkName) {
 		const network = this.networks[networkName];
 		if (!network) {
@@ -285,34 +285,35 @@ class EthereumWalletService {
   	}
 
   	/**
-		* Send Ethereum from one address to another
+	 	* Send Ethereum from one address to another
 	 	* @param {string} senderPrivateKey - Private key of the sender
-	 	* @param {string} receiverAddress - Ethereum address of the recipient
 	 	* @param {string|number} amountToSend - Amount to send in ETH
-   		* @returns {Promise<Object>} Transaction result
-   	*/
-	async sendEther(senderPrivateKey, receiverAddress, amountToSend) {
+	 	* @param {string} receiverAddress - Ethereum address of the recipient
+	 	* @param {Object} options - Optional transaction parameters
+	 	* @returns {Promise<Object>} Transaction result
+	*/
+	async sendEther(senderPrivateKey, receiverAddress, amountToSend, options = {}) {
 		try {
 			// Validate inputs
 			if (!senderPrivateKey || !receiverAddress || !amountToSend) {
 				throw new Error("Missing required parameters");
 			}
-
+		
 			// Validate receiver address
 			if (!this.isValidEthereumAddress(receiverAddress)) {
 				throw new Error("Invalid recipient Ethereum address");
 			}
-
+		
 			// Create wallet instance from private key
 			const wallet = new ethers.Wallet(senderPrivateKey, this.provider);
 			const senderAddress = wallet.address;
-
+		
 			// Convert ETH to wei
 			const amountWei = ethers.parseEther(amountToSend.toString());
-
+		
 			// Get sender's balance
 			const balanceWei = await this.provider.getBalance(senderAddress);
-
+		
 			// Check if sender has enough balance
 			if (balanceWei < amountWei) {
 				throw new Error(`Insufficient balance. Available: ${ethers.formatEther(balanceWei)} ETH, Required: ${amountToSend} ETH`);
@@ -326,45 +327,156 @@ class EthereumWalletService {
 				console.error("Error getting fee data:", error);
 				// Fallback to reasonable defaults if fee data can't be fetched
 				feeData = {
-					maxFeePerGas: ethers.parseUnits("50", "gwei"),
-					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei")
+					maxFeePerGas: ethers.parseUnits("50", "gwei"), // Maximum amount you’re willing to pay (the maximum amount the sender is willing to pay for each unit of gas in the transaction)
+					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei") // Priority fee to include the transaction in the block (is a user-defined priority fee that the sender is willing to pay to ensure their transaction is included in a block quickly.)
 				};
 			}
-
+  
+			// Apply fee multiplier for replacement transactions if specified
+			const feeMultiplier = options.feeMultiplier || 1.1; // Default 10% increase
+			
+			// Get the nonce - either use provided nonce or get the next one
+			const nonce = options.nonce !== undefined ? options.nonce : await this.provider.getTransactionCount(senderAddress); // (number of transactions sent from the sender's address)
+		
 			// Create transaction object
 			const tx = {
 				to: receiverAddress,
 				value: amountWei,
-				gasLimit: 21000, // Standard gas limit for ETH transfer
-				maxFeePerGas: feeData.maxFeePerGas,
-				maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-				nonce: await this.provider.getTransactionCount(senderAddress)
+				gasLimit: options.gasLimit || 21000, // Standard gas limit for ETH transfer
+				nonce: nonce // 
 			};
-
+	
+			// Handle EIP-1559 vs legacy transactions
+			if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+				// EIP-1559 transaction
+				tx.maxFeePerGas = options.maxFeePerGas || ethers.getBigInt(Math.floor(Number(feeData.maxFeePerGas) * feeMultiplier));
+				
+				tx.maxPriorityFeePerGas = options.maxPriorityFeePerGas || ethers.getBigInt(Math.floor(Number(feeData.maxPriorityFeePerGas) * feeMultiplier));
+			} else {
+				// Legacy transaction
+				tx.gasPrice = options.gasPrice || ethers.getBigInt(Math.floor(Number(feeData.gasPrice) * feeMultiplier));
+			}
+	
+			console.log("Sending transaction with params:", {
+				nonce: tx.nonce,
+				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined,
+				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined,
+				gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, "gwei") : undefined
+			});
+	
 			// Sign and send transaction
 			const transaction = await wallet.sendTransaction(tx);
 			console.log(`Transaction sent: ${transaction.hash}`);
-
-			// Wait for transaction to be mined
-			const receipt = await transaction.wait();
-			console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
-
-			return {
-				success: true,
-				txHash: receipt.hash,
-				blockNumber: receipt.blockNumber,
-				from: senderAddress,
-				to: receiverAddress,
-				amount: amountToSend,
-				gasUsed: receipt.gasUsed.toString(),
-				effectiveGasPrice: receipt.effectiveGasPrice.toString(),
-				network: this.currentNetwork
-			};
+		
+			// Wait for transaction to be mined (if waitForConfirmation is true)
+			if (options.waitForConfirmation !== false) {
+				const receipt = await transaction.wait();
+				console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
+		
+				return {
+					success: true,
+					txHash: receipt.hash,
+					blockNumber: receipt.blockNumber,
+					from: senderAddress,
+					to: receiverAddress,
+					amount: amountToSend,
+					gasUsed: receipt.gasUsed.toString(),
+					effectiveGasPrice: receipt.effectiveGasPrice.toString(),
+					network: this.currentNetwork
+				};
+			} else {
+				// Return immediately without waiting for confirmation
+				return {
+					success: true,
+					txHash: transaction.hash,
+					from: senderAddress,
+					to: receiverAddress,
+					amount: amountToSend,
+					nonce: tx.nonce,
+					network: this.currentNetwork,
+					pending: true
+				};
+			}
 		} catch (error) {
 			console.error("Ethereum transaction error:", error);
 			return {
 				success: false,
 				error: "Failed to send Ethereum transaction",
+				details: error.message
+			};
+		}
+	}
+  
+  	/**
+   		* Cancel a pending transaction
+   		* @param {string} senderPrivateKey - Private key of the sender
+   		* @param {number} nonce - Nonce of the transaction to cancel
+   		* @returns {Promise<Object>} Cancellation result
+   	*/
+  	async cancelTransaction(senderPrivateKey, nonce) {
+		try {
+			// Create wallet instance from private key
+			const wallet = new ethers.Wallet(senderPrivateKey, this.provider);
+			const senderAddress = wallet.address;
+			
+			// Get current fee data
+			const feeData = await this.provider.getFeeData();
+			
+			// Create a transaction to self with 0 ETH but higher gas price
+			const tx = {
+				to: senderAddress, // Send to self
+				value: 0, // 0 ETH
+				gasLimit: 21000,
+				nonce: nonce,
+				maxFeePerGas: ethers.getBigInt(Math.floor(Number(feeData.maxFeePerGas) * 1.5)), // 50% higher
+				maxPriorityFeePerGas: ethers.getBigInt(Math.floor(Number(feeData.maxPriorityFeePerGas) * 1.5)) // 50% higher
+			};
+			
+			// Sign and send the cancellation transaction
+			const transaction = await wallet.sendTransaction(tx);
+			console.log(`Cancellation transaction sent: ${transaction.hash}`);
+			
+			// Wait for transaction to be mined
+			const receipt = await transaction.wait();
+			
+			return {
+				success: true,
+				txHash: receipt.hash,
+				blockNumber: receipt.blockNumber,
+				message: `Successfully cancelled transaction with nonce ${nonce}`
+			};
+		} catch (error) {
+			console.error("Transaction cancellation error:", error);
+			return {
+				success: false,
+				error: "Failed to cancel transaction",
+				details: error.message
+			};
+		}
+	}
+  
+	/**
+	 	* Speed up a pending transaction
+	 	* @param {string} senderPrivateKey - Private key of the sender
+	 	* @param {number} nonce - Nonce of the transaction to speed up
+	 	* @param {string} receiverAddress - Original recipient address
+	 	* @param {string|number} amountToSend - Original amount in ETH
+	 	* @param {number} feeMultiplier - Multiplier for the gas fee (default: 1.5 = 50% increase)
+	 	* @returns {Promise<Object>} Speed up result
+	*/
+	async speedUpTransaction(senderPrivateKey, nonce, receiverAddress, amountToSend, feeMultiplier = 1.5) {
+		try {
+			// Simply call sendEther with the same parameters but higher gas price
+			return await this.sendEther(senderPrivateKey, receiverAddress, amountToSend, {
+				nonce: nonce,
+				feeMultiplier: feeMultiplier,
+				waitForConfirmation: true
+			});
+		} catch (error) {
+			console.error("Transaction speed up error:", error);
+			return {
+				success: false,
+				error: "Failed to speed up transaction",
 				details: error.message
 			};
 		}
