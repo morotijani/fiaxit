@@ -138,62 +138,6 @@ class EthereumController {
 		}
 	}
 
-	/**
-		* Send Ethereum from one address to another
-		* @param {Object} req - Express request object
-		* @param {Object} res - Express response object
-	*/
-	sendEther = async (req, res) => {
-		try {
-			const { senderPrivateKey, receiverAddress, amount } = req.body;
-			const network = req.body.network || 'sepolia';
-			
-			// Validate required fields
-			if (!senderPrivateKey || !receiverAddress || !amount) {
-				return res.status(400).json({
-					success: false, 
-					error: "Missing required parameters: senderPrivateKey, receiverAddress, and amount are required"
-				});
-			}
-			
-			// Set the network if specified
-			if (network) {
-				ethereumService.setNetwork(network);
-			}
-			
-			// Validate receiver address
-			if (!ethereumService.isValidEthereumAddress(receiverAddress)) {
-				return res.status(400).json({
-					success: false,
-					error: "Invalid receiver Ethereum address"
-				});
-			}
-      
-			// Send Ethereum
-			const result = await ethereumService.sendEther(senderPrivateKey, receiverAddress, amount);
-			
-			if (result.error) {
-				return res.status(422).json({
-					success: false,
-					error: result.error,
-					details: result.details
-				});
-			}
-			
-			res.status(200).json({
-				success: true,
-				method: "sendEther",
-				data: result
-			});
-		} catch (error) {
-			console.error("Send Ether error:", error);
-			res.status(422).json({
-				success: false,
-				error: error.message || "An error occurred while sending Ethereum"
-			});
-		}
-	}
-
   	/**
    		* Validate Ethereum address
 		* @param {Object} req - Express request object

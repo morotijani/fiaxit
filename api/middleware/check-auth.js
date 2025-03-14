@@ -4,19 +4,24 @@ const User = require('../models/user-model');
 
 // Create Redis client
 const redisClient = redis.createClient({
-    // url: process.env.REDIS_URL || 'redis://127.0.0.1:6379'
-    url: 'redis://127.0.0.1:6379'
+    // username: 'default',
+    // password: 'JLijacYt0AlgDGNXYiL2U3FqFY0jPWkZ',
+    // socket: {
+    //     host: 'redis-13954.c11.us-east-1-3.ec2.redns.redis-cloud.com',
+    //     port: 13954
+    // }
+    url: 'redis://' + process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 });
 
 // Connect to redis
 (async () => {
     try {
         await redisClient.on('error', (err) => {
-            console.error("Redis Client error", err);
+            console.error("Redis Client Error", err);
         })
 
         await redisClient.on('ready', () => {
-            console.log("Redis Client started")
+            console.log("Redis Client Started")
         })
 
         await redisClient.connect();
