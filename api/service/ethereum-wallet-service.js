@@ -442,9 +442,9 @@ class EthereumWalletService {
 		  
 					return {
 						success: true, 
-						txHash: txHash, 
+						txid: txHash, 
 						blockNumber: blockNumber, 
-						from: senderAddress, 
+						senderWalletAddress: senderAddress, 
 						to: receiverAddress, 
 						amount: amountToSend, 
 						gasUsed: gasUsed, 
@@ -456,8 +456,8 @@ class EthereumWalletService {
 				  // Return partial success info since the transaction was sent but confirmation failed
 				  	return {
 						success: true,
-						txHash: transaction.hash,
-						from: senderAddress,
+						txid: transaction.hash,
+						senderWalletAddress: senderAddress,
 						to: receiverAddress,
 						amount: amountToSend,
 						network: this.currentNetwork,
@@ -469,8 +469,8 @@ class EthereumWalletService {
 				// Return immediately without waiting for confirmation
 				return {
 					success: true,
-					txHash: transaction.hash,
-					from: senderAddress,
+					txid: transaction.hash,
+					senderWalletAddress: senderAddress,
 					to: receiverAddress,
 					amount: amountToSend,
 					nonce: tx.nonce,
@@ -602,7 +602,7 @@ class EthereumWalletService {
 				
 				return {
 					success: true,
-					txHash: txHash,
+					txid: txHash,
 					blockNumber: blockNumber,
 					message: `Successfully cancelled transaction with nonce ${nonce}`
 				};
@@ -610,7 +610,7 @@ class EthereumWalletService {
 				console.error("Error waiting for cancellation confirmation:", error);
 				return {
 				success: true,
-				txHash: transaction.hash,
+				txid: transaction.hash,
 				message: `Cancellation transaction sent with hash ${transaction.hash}, but confirmation failed`,
 				confirmationError: error.message,
 				pending: true
@@ -626,7 +626,6 @@ class EthereumWalletService {
 		}
 	}
   
-
 	/**
 	 	* Speed up a pending transaction
 	 	* @param {string} senderPrivateKey - Private key of the sender

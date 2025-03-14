@@ -1,7 +1,6 @@
 const Transaction = require("../models/transaction-model");
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
-const Bitcoin = require("../middleware/bitcoin-controller")
 const EthereumWalletService = require('../service/ethereum-wallet-service')
 
 class TransactionsController {
@@ -82,6 +81,7 @@ class TransactionsController {
                 const senderPrivateKey = req.body.senderPrivateKey
                 const receiverWalletAddress = req.body.receiverAddress 
                 const feeRate = req.body.feeRate || 10 //0.0001
+
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
                         senderPrivateKey, 
@@ -115,18 +115,27 @@ class TransactionsController {
                         const pendingNonce = 42; // You need to know this value
 
                         // Then speed it up with a 50% higher fee
-                        result = await walletService.speedUpTransaction(
+                        result = await EthereumWalletService.speedUpTransaction(
                             senderPrivateKey, 
                             pendingNonce, 
                             receiverWalletAddress, 
                             amount, 
                             higherFee
                         );
-
                     }
-                    if (result.txHash) {
-                        console.log('Ethereum Transaction send successfully:', result.txHash)
+                    
+                    if (result.txid) {
+                        console.log('Ethereum Transaction send successfully:', result.txid)
                         console.log('result:', result)
+                    } else {
+                        console.error('Transaction failed:', result.error, result.details);
+                        res.status(422).json({
+                            success: false, 
+                            method: "createAndSend" + cryptoSymbol,
+                            message: "Transaction failed", 
+                            result: result.error,
+                            details: result.details
+                        });
                     }
                 }
 

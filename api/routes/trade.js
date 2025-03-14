@@ -42,5 +42,5 @@ router.post('/send', TransactionsController.create()); // send transaction (send
         "note": "good transaction"
     }
 */
-router.post('/eth/send', ethereumController.sendEther); // send eth
+router.post('/eth/send', TransactionsController.create()); // send eth
 module.exports = router;
