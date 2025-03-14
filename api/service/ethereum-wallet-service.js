@@ -323,12 +323,18 @@ class EthereumWalletService {
 			let feeData;
 			try {
 				feeData = await this.provider.getFeeData();
+
+				// Ensure fee data is valid
+				if (!feeData) {
+					throw new Error("Invalid fee data received from provider");
+				}
 			} catch (error) {
 				console.error("Error getting fee data:", error);
 				// Fallback to reasonable defaults if fee data can't be fetched
 				feeData = {
 					maxFeePerGas: ethers.parseUnits("50", "gwei"), // Maximum amount you’re willing to pay (the maximum amount the sender is willing to pay for each unit of gas in the transaction)
-					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei") // Priority fee to include the transaction in the block (is a user-defined priority fee that the sender is willing to pay to ensure their transaction is included in a block quickly.)
+					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei"),  // Priority fee to include the transaction in the block (is a user-defined priority fee that the sender is willing to pay to ensure their transaction is included in a block quickly.)
+					gasPrice: ethers.parseUnits("30", "gwei") // Add fallback for legacy transactions
 				};
 			}
   
@@ -345,66 +351,141 @@ class EthereumWalletService {
 				gasLimit: options.gasLimit || 21000, // Standard gas limit for ETH transfer
 				nonce: nonce // 
 			};
-	
+
 			// Handle EIP-1559 vs legacy transactions
 			if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
 				// EIP-1559 transaction
-				tx.maxFeePerGas = options.maxFeePerGas || ethers.getBigInt(Math.floor(Number(feeData.maxFeePerGas) * feeMultiplier));
-				
-				tx.maxPriorityFeePerGas = options.maxPriorityFeePerGas || ethers.getBigInt(Math.floor(Number(feeData.maxPriorityFeePerGas) * feeMultiplier));
-			} else {
+				try {
+				  	// Safe conversion to number with fallback
+				  	let maxFeePerGasValue;
+					try {
+						maxFeePerGasValue = Number(feeData.maxFeePerGas);
+					} catch (e) {
+						maxFeePerGasValue = 0;
+					}
+					
+					if (!isNaN(maxFeePerGasValue) && maxFeePerGasValue > 0) {
+						tx.maxFeePerGas = options.maxFeePerGas || ethers.getBigInt(Math.floor(maxFeePerGasValue * feeMultiplier));
+					} else {
+						tx.maxFeePerGas = ethers.parseUnits("50", "gwei");
+					}
+					
+					// Safe conversion to number with fallback
+					let maxPriorityFeePerGasValue;
+					try {
+						maxPriorityFeePerGasValue = Number(feeData.maxPriorityFeePerGas);
+					} catch (e) {
+						maxPriorityFeePerGasValue = 0;
+					}
+					
+					if (!isNaN(maxPriorityFeePerGasValue) && maxPriorityFeePerGasValue > 0) {
+						tx.maxPriorityFeePerGas = options.maxPriorityFeePerGas || ethers.getBigInt(Math.floor(maxPriorityFeePerGasValue * feeMultiplier));
+					} else {
+						tx.maxPriorityFeePerGas = ethers.parseUnits("1.5", "gwei");
+					}
+				} catch (error) {
+				  	console.error("Error calculating EIP-1559 fees:", error);
+					// Fallback to fixed values
+					tx.maxFeePerGas = ethers.parseUnits("50", "gwei");
+					tx.maxPriorityFeePerGas = ethers.parseUnits("1.5", "gwei");
+				}
+			} else if (feeData.gasPrice) {
 				// Legacy transaction
-				tx.gasPrice = options.gasPrice || ethers.getBigInt(Math.floor(Number(feeData.gasPrice) * feeMultiplier));
+				try {
+				  	// Safe conversion to number with fallback
+				  	let gasPriceValue;
+				  	try {
+						gasPriceValue = Number(feeData.gasPrice);
+					} catch (e) {
+						gasPriceValue = 0;
+					}
+					
+					if (!isNaN(gasPriceValue) && gasPriceValue > 0) {
+						tx.gasPrice = options.gasPrice || ethers.getBigInt(Math.floor(gasPriceValue * feeMultiplier));
+					} else {
+						tx.gasPrice = ethers.parseUnits("30", "gwei");
+					}
+				} catch (error) {
+				  	console.error("Error calculating legacy gas price:", error);
+				  	tx.gasPrice = ethers.parseUnits("30", "gwei");
+				}
+			} else {
+				// If all else fails, use a safe default
+				tx.gasPrice = ethers.parseUnits("30", "gwei");
 			}
 	
+			// Log transaction parameters for debugging
 			console.log("Sending transaction with params:", {
-				nonce: tx.nonce,
-				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined,
-				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined,
-				gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, "gwei") : undefined
+				nonce: tx.nonce, 
+				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined, 
+				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined, 
+				gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, "gwei") : undefined, 
+				gasLimit: tx.gasLimit, 
+				value: ethers.formatEther(tx.value)
 			});
 	
 			// Sign and send transaction
 			const transaction = await wallet.sendTransaction(tx);
 			console.log(`Transaction sent: ${transaction.hash}`);
 		
-			// Wait for transaction to be mined (if waitForConfirmation is true)
-			if (options.waitForConfirmation !== false) {
-				const receipt = await transaction.wait();
-				console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
-		
-				return {
+			   // Wait for transaction to be mined (if waitForConfirmation is true)
+			   if (options.waitForConfirmation !== false) {
+				try {
+				  const receipt = await transaction.wait();
+				  console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
+		  
+				  // Safely extract values with null checks
+				  const blockNumber = receipt.blockNumber ? receipt.blockNumber : null;
+				  const gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : "unknown";
+				  const effectiveGasPrice = receipt.effectiveGasPrice ? receipt.effectiveGasPrice.toString() : "unknown";
+				  const txHash = receipt.hash || transaction.hash;
+		  
+				  return {
 					success: true,
-					txHash: receipt.hash,
-					blockNumber: receipt.blockNumber,
+					txHash: txHash,
+					blockNumber: blockNumber,
 					from: senderAddress,
 					to: receiverAddress,
 					amount: amountToSend,
-					gasUsed: receipt.gasUsed.toString(),
-					effectiveGasPrice: receipt.effectiveGasPrice.toString(),
+					gasUsed: gasUsed,
+					effectiveGasPrice: effectiveGasPrice,
 					network: this.currentNetwork
-				};
-			} else {
-				// Return immediately without waiting for confirmation
-				return {
+				  };
+				} catch (error) {
+				  console.error("Error waiting for transaction confirmation:", error);
+				  // Return partial success info since the transaction was sent but confirmation failed
+				  return {
 					success: true,
 					txHash: transaction.hash,
 					from: senderAddress,
 					to: receiverAddress,
 					amount: amountToSend,
-					nonce: tx.nonce,
 					network: this.currentNetwork,
+					confirmationError: error.message,
 					pending: true
+				  };
+				}
+			  } else {
+				// Return immediately without waiting for confirmation
+				return {
+				  success: true,
+				  txHash: transaction.hash,
+				  from: senderAddress,
+				  to: receiverAddress,
+				  amount: amountToSend,
+				  nonce: tx.nonce,
+				  network: this.currentNetwork,
+				  pending: true
 				};
-			}
-		} catch (error) {
-			console.error("Ethereum transaction error:", error);
-			return {
+			  }
+			} catch (error) {
+			  console.error("Ethereum transaction error:", error);
+			  return {
 				success: false,
 				error: "Failed to send Ethereum transaction",
 				details: error.message
-			};
-		}
+			  };
+			}
 	}
   
   	/**
