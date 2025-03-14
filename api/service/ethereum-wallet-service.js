@@ -489,43 +489,133 @@ class EthereumWalletService {
 	}
   
   	/**
-   		* Cancel a pending transaction
-   		* @param {string} senderPrivateKey - Private key of the sender
-   		* @param {number} nonce - Nonce of the transaction to cancel
-   		* @returns {Promise<Object>} Cancellation result
-   	*/
-  	async cancelTransaction(senderPrivateKey, nonce) {
+	 	* Cancel a pending transaction
+	 	* @param {string} senderPrivateKey - Private key of the sender
+	 	* @param {number} nonce - Nonce of the transaction to cancel
+	 	* @returns {Promise<Object>} Cancellation result
+	*/
+	async cancelTransaction(senderPrivateKey, nonce) {
 		try {
 			// Create wallet instance from private key
 			const wallet = new ethers.Wallet(senderPrivateKey, this.provider);
 			const senderAddress = wallet.address;
 			
-			// Get current fee data
-			const feeData = await this.provider.getFeeData();
-			
+			// Get current fee data with safety checks
+			let feeData;
+			try {
+				feeData = await this.provider.getFeeData();
+				if (!feeData) {
+					throw new Error("Invalid fee data received from provider");
+				}
+			} catch (error) {
+				console.error("Error getting fee data:", error);
+				// Fallback to reasonable defaults
+				feeData = {
+					maxFeePerGas: ethers.parseUnits("50", "gwei"),
+					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei"),
+					gasPrice: ethers.parseUnits("30", "gwei")
+				};
+			}
+		
 			// Create a transaction to self with 0 ETH but higher gas price
 			const tx = {
 				to: senderAddress, // Send to self
 				value: 0, // 0 ETH
 				gasLimit: 21000,
-				nonce: nonce,
-				maxFeePerGas: ethers.getBigInt(Math.floor(Number(feeData.maxFeePerGas) * 1.5)), // 50% higher
-				maxPriorityFeePerGas: ethers.getBigInt(Math.floor(Number(feeData.maxPriorityFeePerGas) * 1.5)) // 50% higher
+				nonce: nonce
 			};
+		
+			// Handle EIP-1559 vs legacy transactions with safety checks
+			if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+				try {
+					// Safe conversion with fallbacks
+					let maxFeePerGasValue;
+					try {
+						maxFeePerGasValue = Number(feeData.maxFeePerGas);
+					} catch (e) {
+						maxFeePerGasValue = 0;
+					}
+					
+					if (!isNaN(maxFeePerGasValue) && maxFeePerGasValue > 0) {
+						tx.maxFeePerGas = ethers.getBigInt(Math.floor(maxFeePerGasValue * 1.5)); // 50% higher
+					} else {
+						tx.maxFeePerGas = ethers.parseUnits("75", "gwei"); // Higher default
+					}
+					
+					let maxPriorityFeePerGasValue;
+					try {
+						maxPriorityFeePerGasValue = Number(feeData.maxPriorityFeePerGas);
+					} catch (e) {
+						maxPriorityFeePerGasValue = 0;
+					}
+					
+					if (!isNaN(maxPriorityFeePerGasValue) && maxPriorityFeePerGasValue > 0) {
+						tx.maxPriorityFeePerGas = ethers.getBigInt(Math.floor(maxPriorityFeePerGasValue * 1.5)); // 50% higher
+					} else {
+						tx.maxPriorityFeePerGas = ethers.parseUnits("2", "gwei"); // Higher default
+					}
+				} catch (error) {
+					console.error("Error calculating EIP-1559 cancellation fees:", error);
+					tx.maxFeePerGas = ethers.parseUnits("75", "gwei");
+					tx.maxPriorityFeePerGas = ethers.parseUnits("2", "gwei");
+				}
+			} else if (feeData.gasPrice) {
+				try {
+					let gasPriceValue;
+					try {
+						gasPriceValue = Number(feeData.gasPrice);
+					} catch (e) {
+						gasPriceValue = 0;
+					}
+					
+					if (!isNaN(gasPriceValue) && gasPriceValue > 0) {
+						tx.gasPrice = ethers.getBigInt(Math.floor(gasPriceValue * 1.5)); // 50% higher
+					} else {
+						tx.gasPrice = ethers.parseUnits("45", "gwei"); // Higher default
+					}
+				} catch (error) {
+					console.error("Error calculating legacy cancellation gas price:", error);
+					tx.gasPrice = ethers.parseUnits("45", "gwei");
+				}
+			} else {
+				tx.gasPrice = ethers.parseUnits("45", "gwei");
+			}
+			
+			console.log("Sending cancellation transaction with params:", {
+				nonce: tx.nonce,
+				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined,
+				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined,
+				gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, "gwei") : undefined
+			});
 			
 			// Sign and send the cancellation transaction
 			const transaction = await wallet.sendTransaction(tx);
 			console.log(`Cancellation transaction sent: ${transaction.hash}`);
-			
-			// Wait for transaction to be mined
-			const receipt = await transaction.wait();
-			
-			return {
+		
+			// Wait for transaction to be mined with safety checks
+			try {
+				const receipt = await transaction.wait();
+				
+				// Safely extract values
+				const blockNumber = receipt.blockNumber ? receipt.blockNumber : null;
+				const txHash = receipt.hash || transaction.hash;
+				
+				return {
+					success: true,
+					txHash: txHash,
+					blockNumber: blockNumber,
+					message: `Successfully cancelled transaction with nonce ${nonce}`
+				};
+			} catch (error) {
+				console.error("Error waiting for cancellation confirmation:", error);
+				return {
 				success: true,
-				txHash: receipt.hash,
-				blockNumber: receipt.blockNumber,
-				message: `Successfully cancelled transaction with nonce ${nonce}`
-			};
+				txHash: transaction.hash,
+				message: `Cancellation transaction sent with hash ${transaction.hash}, but confirmation failed`,
+				confirmationError: error.message,
+				pending: true
+				};
+			}
 		} catch (error) {
 			console.error("Transaction cancellation error:", error);
 			return {
@@ -536,6 +626,7 @@ class EthereumWalletService {
 		}
 	}
   
+
 	/**
 	 	* Speed up a pending transaction
 	 	* @param {string} senderPrivateKey - Private key of the sender
