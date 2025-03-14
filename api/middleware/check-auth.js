@@ -3,29 +3,35 @@ const redis = require("redis");
 const User = require('../models/user-model');
 
 // Create Redis client
-const redisClient = redis.createClient({
-    // username: 'default',
-    // password: 'JLijacYt0AlgDGNXYiL2U3FqFY0jPWkZ',
-    // socket: {
-    //     host: 'redis-13954.c11.us-east-1-3.ec2.redns.redis-cloud.com',
-    //     port: 13954
-    // }
-    url: 'redis://' + process.env.REDIS_URL || 'redis://127.0.0.1:6379'
-});
+let redisClient;
+if (process.env.NODE_ENV !== 'production') {
+    redisClient = redis.createClient({ 
+        url: 'redis://127.0.0.1:6379'
+    });
+} else {
+    redisClient = redis.createClient({ 
+        username: process.env.REDIS_USERNAME || 'default',
+        password: process.env.REDIS_PASSWORD,
+        socket: {
+            host: process.env.REDIS_HOST,
+            port: parseInt(process.env.REDIS_PORT || '6379')
+        }
+    });
+}
 
 // Connect to redis
 (async () => {
     try {
         await redisClient.on('error', (err) => {
-            console.error("Redis Client Error", err);
+            console.error("Redis Client Error.", err);
         })
 
         await redisClient.on('ready', () => {
-            console.log("Redis Client Started")
+            console.log("Redis Client Started.")
         })
 
         await redisClient.connect();
-        console.log("Connected to Redis");
+        console.log("Connected to Redis.");
     } catch(err) {
         console.error('Redis connection error:', err);
     }
@@ -117,12 +123,9 @@ const blacklistToken = async (token) => {
 
             if (expiryTime > 0) {
                 // Store token in blacklist until its original expiration time
-                const rediz = await redisClient.set(`blacklist:${token}`, 'true', {
+                await redisClient.set(`blacklist:${token}`, 'true', {
                     EX: expiryTime
                 });
-                if (!rediz) {
-                    console.log('redis problem');
-                }
 
                 console.log(`Token blacklisted for ${expiryTime} seconds`);
                 return true;

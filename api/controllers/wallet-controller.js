@@ -1,13 +1,9 @@
 const Wallet = require("../models/wallet-model");
 const { v4: uuidv4 } = require('uuid')
-const bitcore = require('bitcore-lib');
-const { PrivateKey, Networks } = bitcore;
-const  Mnemonic = require('bitcore-mnemonic');
 const USDTService = require('../service/usdt-service');
 const Bitcoin = require("../middleware/bitcoin-controller")
-const Ethereum = require("../middleware/ethereum-controller")
-const ethereumService = require('../service/ethereum-wallet-service'); // Import the service directly
-const { net } = require("web3");
+const EthereumWalletService = require('../service/ethereum-wallet-service')
+const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class WalletsController {
 
@@ -86,8 +82,7 @@ class WalletsController {
         return async (req, res, next) => {
             try {
                 const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
-                const crypto = req.params.id;
+                const crypto = req.params.crypto;
                 const userId = req.userData.user_id;
                 const walletId = uuidv4();
                 
@@ -100,8 +95,8 @@ class WalletsController {
                 
                 if (crypto === 'BTC') {
                     try {
-                        const walletResponse = await Bitcoin.generateWallet(isTestnet);
-                        const wallet = walletResponse.wallet;
+                        const wallet = await BitcoinWalletService.generateWallet(isTestnet);
+                        // const wallet = walletResponse.wallet;
                         console.log('Generated wallet:', wallet);
                         
                         walletXpub = null;
@@ -145,7 +140,7 @@ class WalletsController {
 			            // Check if a specific network was requested
                         const network = ((isTestnet) ? 'sepolia' : req.query.network);
                         if (network) {
-                            ethereumService.setNetwork(network);
+                            EthereumWalletService.setNetwork(network);
                         } else {
                             return res.status(400).json({
                                 success: false,
@@ -153,7 +148,7 @@ class WalletsController {
                             });
                         }
 
-                        const wallet = ethereumService.generateWallet();
+                        const wallet = EthereumWalletService.generateWallet();
                         
                         walletAddress = wallet.address;
                         walletPrivatekey = wallet.privateKey;
@@ -189,11 +184,11 @@ class WalletsController {
                 
                 res.status(201).json({
                     success: true,
-                    method: "createAndGenerateWallet",
+                    method: "createAndGenerate"+crypto+"Wallet",
                     wallet: wallet
                 });
             } catch(err) {
-                console.error("Wallet address creation error:", err);
+                console.error(crypto + " wallet address creation error:", err);
                 res.status(422).json({
                     success: false,
                     error: err.message || "An error occurred during wallet address creation"

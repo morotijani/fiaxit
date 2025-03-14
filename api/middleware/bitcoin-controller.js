@@ -1,31 +1,6 @@
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class BitcoinController {
-	/**
-   		* Generate a new Bitcoin wallet
-   	*/
-	generateWallet = async (isTestnet = true) => {
-		try {
-			const wallet = await BitcoinWalletService.generateWallet(isTestnet);
-			return {
-				success: true,
-				method: "generateBitcoinWallet",
-				wallet: {
-					address: wallet.address,
-					privateKey: wallet.privateKey,
-					mnemonic: wallet.mnemonic,
-					network: wallet.network
-				}
-			};
-		} catch (error) {
-			console.error("Bitcoin wallet generation error:", error);
-			return {
-				success: false,
-				error: "Failed to generate Bitcoin wallet",
-				details: error.message
-			};
-		}
-	};
 
   	/**
    		* Get Bitcoin wallet information

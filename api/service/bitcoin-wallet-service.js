@@ -17,8 +17,8 @@ class BitcoinWalletService {
 		
 		// BlockCypher API endpoints
 		this.apiEndpoints = {
-		mainnet: 'https://api.blockcypher.com/v1/btc/main',
-		testnet: 'https://api.blockcypher.com/v1/btc/test3'
+			mainnet: 'https://api.blockcypher.com/v1/btc/main',
+			testnet: 'https://api.blockcypher.com/v1/btc/test3'
 		};
 	}
 
@@ -80,7 +80,6 @@ class BitcoinWalletService {
 	*/
 	async sendCrypto(
 		senderPrivateKey,
-		// senderAddress,
 		receiverAddress, 
 		amountToSend,
 		isTestnet

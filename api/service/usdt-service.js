@@ -1,7 +1,4 @@
 const ethers = require("ethers");
-const Web3 = require("web3");
-const HDWalletProvider = require("@truffle/hdwallet-provider");
-require("dotenv").config()
 
 // USDT ERC-20 Contract ABI (Only the functions we need)
 const USDT_ABI = [
@@ -410,4 +407,4 @@ class USDTService {
     }
 }
 
-module.exports = USDTService;
+module.exports = new USDTService();
