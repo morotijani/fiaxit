@@ -428,64 +428,64 @@ class EthereumWalletService {
 			const transaction = await wallet.sendTransaction(tx);
 			console.log(`Transaction sent: ${transaction.hash}`);
 		
-			   // Wait for transaction to be mined (if waitForConfirmation is true)
-			   if (options.waitForConfirmation !== false) {
+			// Wait for transaction to be mined (if waitForConfirmation is true)
+			if (options.waitForConfirmation !== false) {
 				try {
-				  const receipt = await transaction.wait();
-				  console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
+				  	const receipt = await transaction.wait();
+				  	console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
 		  
-				  // Safely extract values with null checks
-				  const blockNumber = receipt.blockNumber ? receipt.blockNumber : null;
-				  const gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : "unknown";
-				  const effectiveGasPrice = receipt.effectiveGasPrice ? receipt.effectiveGasPrice.toString() : "unknown";
-				  const txHash = receipt.hash || transaction.hash;
+					// Safely extract values with null checks
+					const blockNumber = receipt.blockNumber ? receipt.blockNumber : null;
+					const gasUsed = receipt.gasUsed ? receipt.gasUsed.toString() : "unknown";
+					const effectiveGasPrice = receipt.effectiveGasPrice ? receipt.effectiveGasPrice.toString() : "unknown";
+					const txHash = receipt.hash || transaction.hash;
 		  
-				  return {
-					success: true,
-					txHash: txHash,
-					blockNumber: blockNumber,
-					from: senderAddress,
-					to: receiverAddress,
-					amount: amountToSend,
-					gasUsed: gasUsed,
-					effectiveGasPrice: effectiveGasPrice,
-					network: this.currentNetwork
-				  };
+					return {
+						success: true, 
+						txHash: txHash, 
+						blockNumber: blockNumber, 
+						from: senderAddress, 
+						to: receiverAddress, 
+						amount: amountToSend, 
+						gasUsed: gasUsed, 
+						effectiveGasPrice: effectiveGasPrice, 
+						network: this.currentNetwork
+					};
 				} catch (error) {
 				  console.error("Error waiting for transaction confirmation:", error);
 				  // Return partial success info since the transaction was sent but confirmation failed
-				  return {
+				  	return {
+						success: true,
+						txHash: transaction.hash,
+						from: senderAddress,
+						to: receiverAddress,
+						amount: amountToSend,
+						network: this.currentNetwork,
+						confirmationError: error.message,
+						pending: true
+				  	};
+				}
+			} else {
+				// Return immediately without waiting for confirmation
+				return {
 					success: true,
 					txHash: transaction.hash,
 					from: senderAddress,
 					to: receiverAddress,
 					amount: amountToSend,
+					nonce: tx.nonce,
 					network: this.currentNetwork,
-					confirmationError: error.message,
 					pending: true
-				  };
-				}
-			  } else {
-				// Return immediately without waiting for confirmation
-				return {
-				  success: true,
-				  txHash: transaction.hash,
-				  from: senderAddress,
-				  to: receiverAddress,
-				  amount: amountToSend,
-				  nonce: tx.nonce,
-				  network: this.currentNetwork,
-				  pending: true
 				};
-			  }
-			} catch (error) {
-			  console.error("Ethereum transaction error:", error);
-			  return {
+			}
+		} catch (error) {
+			console.error("Ethereum transaction error:", error);
+			return {
 				success: false,
 				error: "Failed to send Ethereum transaction",
 				details: error.message
-			  };
-			}
+			};
+		}
 	}
   
   	/**
