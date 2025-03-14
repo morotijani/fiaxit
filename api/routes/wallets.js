@@ -17,9 +17,9 @@ router.get('/usdt/:address/info', USDTController.getWalletInfo()); // get usdt w
 
 
 /** BTC */
-// Usage (example): GET /api/v1/wallets/btc/:address/info
-router.get('/btc/:address/info', WalletsController.getWalletInfo()); // get btc wallet info
-// Usage (example): GET /api/v1/wallets/btc/:address/balance
+// Usage (example): GET /api/v1/wallets/btc/:address/info?testnet=true
+router.get('/btc/:address/info', BitcoinWalletService.getWalletInfo()); // get btc wallet info
+// Usage (example): GET /api/v1/wallets/btc/:address/balance?testnet=true
 router.get('/btc/:address/balance', BitcoinWalletService.getWalletBalance()); // get btc balance
 
 

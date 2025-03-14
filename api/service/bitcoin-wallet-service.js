@@ -275,7 +275,7 @@ class BitcoinWalletService {
                 // Format the response
                 res.status(200).json({
                     success: true,
-                    method: "getWalletBalance", 
+                    method: "getBitcoinWalletBalance", 
                     data: {
                         address: walletAddress,
                         network: isTestnet ? 'testnet' : 'mainnet',
@@ -310,118 +310,131 @@ class BitcoinWalletService {
 	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
 	   * @returns {Promise<Object>} Wallet information
 	*/
-	async getWalletInfo(address, isTestnet = true) {
-		try {
-			// Validate Bitcoin address
-			if (!this.isValidBitcoinAddress(address, isTestnet)) {
-				throw new Error("Invalid Bitcoin address");
+
+	getWalletInfo = () => {
+		return async (req, res, next) => {
+			try {
+				const address = req.params.address;
+				const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+				if (!address) {
+					return res.status(400).json({
+						success: false,
+						error: "Wallet address is required"
+					});
+				}
+
+				// Validate Bitcoin address
+				if (!this.isValidBitcoinAddress(address, isTestnet)) {
+					throw new Error("Invalid Bitcoin address");
+				}
+				
+				const network = isTestnet ? 'testnet' : 'mainnet';
+				const apiUrl = `${this.apiEndpoints[network]}/addrs/${address}`;
+				
+				// Fetch address information from BlockCypher API
+				const response = await axios.get(apiUrl);
+				const data = response.data;
+				
+				// Fetch recent transactions
+				const txsUrl = `${apiUrl}/full?limit=10`;
+				const txsResponse = await axios.get(txsUrl);
+				const txsData = txsResponse.data;
+				
+				// Format transactions
+				const transactions = txsData.txs ? txsData.txs.map(tx => {
+					// Calculate if this transaction is sending or receiving for this address
+					let type = 'unknown';
+					let amount = 0;
+					
+					// Check inputs (sending)
+					const isInput = tx.inputs.some(input => 
+						input.addresses && input.addresses.includes(address)
+					);
+					
+					// Check outputs (receiving)
+					const isOutput = tx.outputs.some(output => 
+						output.addresses && output.addresses.includes(address)
+					);
+					
+					if (isInput && isOutput) {
+						type = 'self';
+						
+						// Calculate the change amount
+						const totalOut = tx.outputs.reduce((sum, output) => {
+							if (output.addresses && !output.addresses.includes(address)) {
+							return sum + output.value;
+							}
+							return sum;
+						}, 0);
+						
+						amount = -totalOut;
+					} else if (isInput) {
+						type = 'sent';
+						
+						// Calculate the sent amount (excluding change)
+						const totalOut = tx.outputs.reduce((sum, output) => {
+							if (output.addresses && !output.addresses.includes(address)) {
+								return sum + output.value;
+							}
+								return sum;
+						}, 0);
+						
+						amount = -totalOut;
+					} else if (isOutput) {
+						type = 'received';
+						
+						// Calculate the received amount
+						amount = tx.outputs.reduce((sum, output) => {
+							if (output.addresses && output.addresses.includes(address)) {
+								return sum + output.value;
+							}
+							return sum;
+						}, 0);
+					}
+					
+					return {
+						txid: tx.hash,
+						type,
+						amount: amount / 100000000, // Convert satoshis to BTC
+						fee: tx.fees / 100000000,
+						confirmations: tx.confirmations || 0,
+						blockHeight: tx.block_height || null,
+						timestamp: tx.received ? new Date(tx.received).toISOString() : null,
+						inputs: tx.inputs.map(input => ({
+							addresses: input.addresses || [],
+							value: input.output_value ? input.output_value / 100000000 : 0
+						})),
+						outputs: tx.outputs.map(output => ({
+							addresses: output.addresses || [],
+							value: output.value ? output.value / 100000000 : 0
+						}))
+					};
+				}) : [];
+				
+				res.status(200).json({
+					success: true, 
+					address, 
+					network, 
+					balance: {
+						confirmed: data.balance / 100000000, // Convert satoshis to BTC
+						unconfirmed: data.unconfirmed_balance / 100000000, 
+						total: (data.balance + data.unconfirmed_balance) / 100000000
+					}, 
+					transactions, 
+					txCount: data.n_tx, 
+					totalReceived: data.total_received / 100000000, 
+					totalSent: data.total_sent / 100000000, 
+					lastUpdated: new Date().toISOString()
+				});
+			} catch (error) {
+				console.error("Error getting Bitcoin wallet info:", error);
+				res.status(422).json({
+					success: false,
+					method: "getBitcoinWalletInfo", 
+					message: "Failed to get wallet info",
+					details: error.message || "An error occurred while fetching wallet balance"
+				});
 			}
-			
-			const network = isTestnet ? 'testnet' : 'mainnet';
-			const apiUrl = `${this.apiEndpoints[network]}/addrs/${address}`;
-			
-			// Fetch address information from BlockCypher API
-			const response = await axios.get(apiUrl);
-			const data = response.data;
-			
-			// Fetch recent transactions
-			const txsUrl = `${apiUrl}/full?limit=10`;
-			const txsResponse = await axios.get(txsUrl);
-			const txsData = txsResponse.data;
-			
-			// Format transactions
-			const transactions = txsData.txs ? txsData.txs.map(tx => {
-				// Calculate if this transaction is sending or receiving for this address
-				let type = 'unknown';
-				let amount = 0;
-				
-				// Check inputs (sending)
-				const isInput = tx.inputs.some(input => 
-				input.addresses && input.addresses.includes(address)
-				);
-				
-				// Check outputs (receiving)
-				const isOutput = tx.outputs.some(output => 
-				output.addresses && output.addresses.includes(address)
-				);
-				
-				if (isInput && isOutput) {
-				type = 'self';
-				
-				// Calculate the change amount
-				const totalOut = tx.outputs.reduce((sum, output) => {
-					if (output.addresses && !output.addresses.includes(address)) {
-					return sum + output.value;
-					}
-					return sum;
-				}, 0);
-				
-				amount = -totalOut;
-				} else if (isInput) {
-				type = 'sent';
-				
-				// Calculate the sent amount (excluding change)
-				const totalOut = tx.outputs.reduce((sum, output) => {
-					if (output.addresses && !output.addresses.includes(address)) {
-					return sum + output.value;
-					}
-					return sum;
-				}, 0);
-				
-				amount = -totalOut;
-				} else if (isOutput) {
-				type = 'received';
-				
-				// Calculate the received amount
-				amount = tx.outputs.reduce((sum, output) => {
-					if (output.addresses && output.addresses.includes(address)) {
-						return sum + output.value;
-					}
-					return sum;
-				}, 0);
-			}
-				
-				return {
-					txid: tx.hash,
-					type,
-					amount: amount / 100000000, // Convert satoshis to BTC
-					fee: tx.fees / 100000000,
-					confirmations: tx.confirmations || 0,
-					blockHeight: tx.block_height || null,
-					timestamp: tx.received ? new Date(tx.received).toISOString() : null,
-					inputs: tx.inputs.map(input => ({
-						addresses: input.addresses || [],
-						value: input.output_value ? input.output_value / 100000000 : 0
-					})),
-					outputs: tx.outputs.map(output => ({
-						addresses: output.addresses || [],
-						value: output.value ? output.value / 100000000 : 0
-					}))
-				};
-			}) : [];
-			
-			return {
-				success: true,
-				address,
-				network,
-				balance: {
-					confirmed: data.balance / 100000000, // Convert satoshis to BTC
-					unconfirmed: data.unconfirmed_balance / 100000000,
-					total: (data.balance + data.unconfirmed_balance) / 100000000
-				},
-				transactions,
-				txCount: data.n_tx,
-				totalReceived: data.total_received / 100000000,
-				totalSent: data.total_sent / 100000000,
-				lastUpdated: new Date().toISOString()
-			};
-		} catch (error) {
-			console.error("Error getting Bitcoin wallet info:", error);
-			return {
-				success: false,
-				error: "Failed to get wallet info",
-				details: error.message
-			};
 		}
 	}
 

@@ -1,30 +1,10 @@
 const Wallet = require("../models/wallet-model");
 const { v4: uuidv4 } = require('uuid')
 const USDTService = require('../service/usdt-service');
-const Bitcoin = require("../middleware/bitcoin-controller")
 const EthereumWalletService = require('../service/ethereum-wallet-service')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class WalletsController {
-
-    constructor() {
-        this.usdtService = new USDTService();
-    }
-
-    // generate wallet
-    getWalletInfo = () => {
-        return async (req, res) => {
-            try {
-                const add = req.params.address;
-                const info = Bitcoin.getWalletInfo(add, true); // true for testnet
-                await info(req, res)
-                return info;
-            } catch (error) {
-                res.status(500).json({ success: false, error: error.message });
-            }
-        }
-    }
-
 
     // get all method
     getAll = () => {
@@ -119,13 +99,14 @@ class WalletsController {
                     }
                 } else if (crypto === 'USDT') {
                     try {
-                        const wallet = this.usdtService.generateWallet();
+                        const wallet = USDTService.generateWallet();
                         walletXpub = null 
                         walletAddress = wallet.address
                         walletPrivatekey = wallet.privateKey
                         walletMnemonic = wallet.mnemonic
                         
                         console.log("USDT Wallet generated:", wallet);
+                        return;
                     } catch (error) {
                         console.error("USDT Wallet generation error:", error);
                         res.status(500).json({

@@ -1,10 +1,6 @@
 const USDTService = require('../service/usdt-service');
 
 class USDTController {
-    constructor() {
-        this.usdtService = new USDTService();
-    }
-
     /**
         * Get USDT balance for an address
     */
@@ -21,7 +17,7 @@ class USDTController {
                     });
                 }
                 
-                const balance = await this.usdtService.getUSDTBalance(address, isTestnet);
+                const balance = await USDTService.getUSDTBalance(address, isTestnet);
                 
                 if (balance.error) {
                     return res.status(400).json({
@@ -91,7 +87,7 @@ class USDTController {
                     });
                 }
                 
-                const result = await this.usdtService.SendUSDT(
+                const result = await USDTService.SendUSDT(
                     formattedPrivateKey,
                     receiverAddress,
                     amount,
@@ -139,7 +135,7 @@ class USDTController {
                     });
                 }
                 
-                const walletInfo = await this.usdtService.getWalletInfo(address, isTestnet);
+                const walletInfo = await USDTService.getWalletInfo(address, isTestnet);
                 
                 if (!walletInfo.success) {
                     return res.status(400).json({
