@@ -296,7 +296,7 @@ class BitcoinWalletService {
                 });
             } catch(err) {
                 console.error("Wallet balance error:", err);
-                res.status(422).json({
+                res.status(500).json({
                     success: false,
                     error: err.message || "An error occurred while fetching wallet balance"
                 });
@@ -431,7 +431,7 @@ class BitcoinWalletService {
 				res.status(422).json({
 					success: false,
 					method: "getBitcoinWalletInfo", 
-					message: "Failed to get wallet info",
+					error: "Failed to BTC get wallet info",
 					details: error.message || "An error occurred while fetching wallet balance"
 				});
 			}

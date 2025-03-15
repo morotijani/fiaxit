@@ -3,6 +3,7 @@ const router = express.Router();
 const WalletsController = require("../controllers/wallet-controller");
 const USDTController = require('../middleware/usdt-controller');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
+const USDTService = require('../service/usdt-service');
 const ethereumController = require('../middleware/ethereum-controller');
 
 // Usage (example): POST /api/v1/wallets/:crypto/generate?testnet=true(default is true) | (on ETH you can provide your network eg: ?network=networkname)
@@ -10,10 +11,10 @@ router.post('/:crypto/generate', WalletsController.generateWallet()); // generat
 
 
 /** USDT */
-// Usage (example): GET /api/v1/wallets/usdt/:address/balance
-router.get('/usdt/:address/balance', USDTController.getBalance()); // get usdt balance
-// Usage (example): GET /api/v1/wallets/usdt/:address/info
-router.get('/usdt/:address/info', USDTController.getWalletInfo()); // get usdt wallet info
+// Usage (example): GET /api/v1/wallets/usdt/:address/balance?testnet=true (default is true)
+router.get('/usdt/:address/balance', USDTService.getWalletBalance()); // get usdt balance
+// Usage (example): GET /api/v1/wallets/usdt/:address/info?testnet=true (default is true)
+router.get('/usdt/:address/info', USDTService.getWalletInfo()); // get usdt wallet info
 
 
 /** BTC */
