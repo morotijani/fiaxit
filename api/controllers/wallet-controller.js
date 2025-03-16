@@ -6,7 +6,7 @@ const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 
 class WalletsController {
 
-    // get all method
+    // get all wallets
     getAll = () => {
         return async (req, res, next) => {
             try {
@@ -17,14 +17,20 @@ class WalletsController {
                     },
                     order: [['createdAt', 'DESC']]
                 });
+                
                 res.status(200).json({
                     success: true,
-                    method: "getAll",
+                    method: "getAllWallet",
                     data: rows,
                     total: count
                 })
             } catch(err) {
-                res.status(422).json(err.error)
+                res.status(422).json({
+                    success: false, 
+                    method: "getAllWallet",
+                    error: "Error occured fetching all wallets", 
+                    details: err.error
+                })
             }
         }
     }
