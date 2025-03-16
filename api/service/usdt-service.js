@@ -3,25 +3,25 @@ const ethers = require("ethers");
 // USDT ERC-20 Contract ABI (Only the functions we need)
 const USDT_ABI = [
     {
-        "constant": true,
-        "inputs": [{"name": "_owner", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"name": "balance", "type": "uint256"}],
+        "constant": true, 
+        "inputs": [{"name": "_owner", "type": "address"}], 
+        "name": "balanceOf", 
+        "outputs": [{"name": "balance", "type": "uint256"}], 
         "type": "function"
     }, {
-        "constant": false,
+        "constant": false, 
         "inputs":[
             {"name": "_to", "type": "address"}, 
             {"name": "_value", "type": "uint256"}
         ],
-        "name": "transfer",
+        "name": "transfer", 
         "outputs": [{"name": "", "type": "bool"}], 
         "type": "function"
     }, {
         "constant": true, 
         "inputs": [], 
         "name": "decimals", 
-        "outputs": [{"name": "", "type": "uint8"}],
+        "outputs": [{"name": "", "type": "uint8"}], 
         "type": "function"
     }
 ];
@@ -32,34 +32,27 @@ const USDT_CONTRACT_ADDRESS = {
     sepolia: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06"  // Sepolia Testnet (example address)
 }
 
-// Infura or Alchemy endpoints
-// const NETWORK_ENDPOINTS = {
-//     mainnet: process.env.ETH_MAINNET_ENDPOINT || "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
-//     sepolia: process.env.ETH_SEPOLIA_ENDPOINT || "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514"
-// }
-
-
 // Infura or Alchemy endpoints with fallbacks
 const NETWORK_ENDPOINTS = {
     mainnet: [
-        process.env.ETH_MAINNET_ENDPOINT,
-        "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514",
-        "https://eth-mainnet.g.alchemy.com/v2/demo",
+        process.env.ETH_MAINNET_ENDPOINT, 
+        "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
+        "https://eth-mainnet.g.alchemy.com/v2/demo", 
         "https://rpc.ankr.com/eth"
     ].filter(Boolean),
     sepolia: [
-        process.env.ETH_SEPOLIA_ENDPOINT,
-        "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514",
-        "https://eth-sepolia.g.alchemy.com/v2/demo",
+        process.env.ETH_SEPOLIA_ENDPOINT, 
+        "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
+        "https://eth-sepolia.g.alchemy.com/v2/demo", 
         "https://rpc.sepolia.org"
     ].filter(Boolean)
 };
 
 /**
- * Create a provider with fallback URLs
- * @param {string} network - Network name (mainnet or sepolia)
- * @returns {ethers.JsonRpcProvider} - Connected provider
- */
+    * Create a provider with fallback URLs
+    * @param {string} network - Network name (mainnet or sepolia)
+    * @returns {ethers.JsonRpcProvider} - Connected provider
+*/
 async function createProvider(network) {
     const endpoints = NETWORK_ENDPOINTS[network];
     
@@ -70,16 +63,16 @@ async function createProvider(network) {
             
             // Test the connection
             await provider.getBlockNumber();
-            console.log(`Connected to ${network} using ${endpoint}`);
+            console.log(`Connected to ${network} using ${endpoint}.`);
             return provider;
         } catch (error) {
-            console.warn(`Failed to connect to ${endpoint}: ${error.message}`);
+            console.warn(`Failed to connect to ${endpoint}: ${error.message}.`);
             // Continue to the next endpoint
         }
     }
     
     // If all endpoints fail, throw an error
-    throw new Error(`Failed to connect to any ${network} endpoint`);
+    throw new Error(`Failed to connect to any ${network} endpoint.`);
 }
 
 
@@ -96,12 +89,12 @@ class USDTService {
 
             return {
                 address: wallet.address, 
-                privateKey: wallet.privateKey,
+                privateKey: wallet.privateKey, 
                 mnemonic: wallet.mnemonic.phrase
             }
         } catch(error) {
             console.error("Error generating wallet:", error);
-            throw new Error(`Failed to generate wallet: ${error.message}`);
+            throw new Error(`Failed to generate wallet: ${error.message}.`);
         }
     }
 
@@ -119,9 +112,9 @@ class USDTService {
                 
                 if (!address) {
                     return res.status(400).json({
-                        success: false,
+                        success: false, 
                         method: "getUSDTBalance", 
-                        error: "Address parameter is required"
+                        error: "Address parameter is required."
                     });
                 }
 
@@ -129,7 +122,7 @@ class USDTService {
                     return res.status(400).json({
                         success: false, 
                         method: "getUSDTBalance", 
-                        error: "Invalid Ethereum address"
+                        error: "Invalid Ethereum address."
                     });
                 }
 
@@ -142,16 +135,16 @@ class USDTService {
                 } catch (error) {
                     return res.status(503).json({
                         success: false,
-                        method: "getUSDTBalance",
-                        error: "Network connection failed",
+                        method: "getUSDTBalance", 
+                        error: "Network connection failed.", 
                         details: error.message
                     });
                 }
 
                 // Create USDT contract instance 
                 const usdtContract = new ethers.Contract(
-                    USDT_CONTRACT_ADDRESS[network],
-                    USDT_ABI,
+                    USDT_CONTRACT_ADDRESS[network], 
+                    USDT_ABI, 
                     provider
                 );
 
@@ -190,18 +183,20 @@ class USDTService {
                 }
 
                 res.status(200).json({
-                    success: true,
+                    success: true, 
                     method: "getUSDTBalance", 
-                    address,
-                    network: isTestnet ? "sepolia" : "mainnet",
-                    usdt: {
-                        balance: balance, 
-                        rawBalance: rawBalance.toString(), // Ensure BigInt is converted to string
-                        decimals: decimals
-                    }, 
-                    eth: {
-                        balance: ethBalanceFormatted, 
-                        rawBalance: ethBalance.toString() // Ensure BigInt is converted to string
+                    data: {
+                        address, 
+                        network: isTestnet ? "sepolia" : "mainnet", 
+                        usdt: {
+                            balance: balance, 
+                            rawBalance: rawBalance.toString(), // Ensure BigInt is converted to string
+                            decimals: decimals
+                        }, 
+                        eth: {
+                            balance: ethBalanceFormatted, 
+                            rawBalance: ethBalance.toString() // Ensure BigInt is converted to string
+                        }
                     }
                 });
             } catch(error) {
@@ -209,8 +204,8 @@ class USDTService {
                 res.status(500).json({
                     success: false, 
                     method: "getUSDTBalance", 
-                    error: "Failed to get USDT balance", 
-                    details: error.message || "An error occurred while fetching USDT wallet balance"
+                    error: "Failed to get USDT balance.", 
+                    details: error.message || "An error occurred while fetching USDT wallet balance."
                 });
             }
         }
@@ -327,12 +322,12 @@ class USDTService {
     async SendUSDT(senderPrivateKey, receiverAddress, amount, isTestnet = true) {
         try {
             if (!senderPrivateKey || !receiverAddress || !amount) {
-                throw new Error("Missing required parameters");
+                throw new Error("Missing required parameters.");
             }
 
             // Validate and format private key
             if (typeof senderPrivateKey !== 'string') {
-                throw new Error("Private key must be a string");
+                throw new Error("Private key must be a string.");
             }
             
             // Ensure private key has 0x prefix
@@ -346,7 +341,7 @@ class USDTService {
             }
 
             if (!ethers.isAddress(receiverAddress)) {
-                throw new Error("Invalid receiver Ethereum address")
+                throw new Error("Invalid receiver Ethereum address.")
             }
 
             const network = isTestnet ? "sepolia" : "mainnet";
@@ -356,7 +351,7 @@ class USDTService {
             try {
                 provider = await createProvider(network);
             } catch (error) {
-                throw new Error(`Network connection failed: ${error.message}`);
+                throw new Error(`Network connection failed: ${error.message}.`);
             }
             
             // Create wallet with validated private key
@@ -364,15 +359,15 @@ class USDTService {
             try {
                 wallet = new ethers.Wallet(senderPrivateKey, provider);
             } catch (error) {
-                throw new Error(`Invalid private key: ${error.message}`);
+                throw new Error(`Invalid private key: ${error.message}.`);
             }
         
             const senderAddress = wallet.address;
 
             // Create contract instance
             const usdtContract = new ethers.Contract(
-                USDT_CONTRACT_ADDRESS[network],
-                USDT_ABI,
+                USDT_CONTRACT_ADDRESS[network], 
+                USDT_ABI, 
                 wallet
             );
 
@@ -395,7 +390,7 @@ class USDTService {
             try {
                 senderBalance = await usdtContract.balanceOf(senderAddress);
             } catch (error) {
-                throw new Error(`Failed to get USDT balance: ${error.message}`);
+                throw new Error(`Failed to get USDT balance: ${error.message}.`);
             }
             
             // In ethers v6, BigNumber methods are different
@@ -420,11 +415,11 @@ class USDTService {
                 const gasLimit = 100000n; // Estimated gas for ERC-20 transfers
                 gasCost = gasPrice * gasLimit;
             } catch (error) {
-                throw new Error(`Failed to check ETH balance: ${error.message}`);
+                throw new Error(`Failed to check ETH balance: ${error.message}.`);
             }
 
             if (ethBalance < gasCost) {
-                throw new Error(`Insufficient ETH balance for gas. Required: ${ethers.formatEther(gasCost)} ETH, Available: ${ethers.formatEther(ethBalance)} ETH`);
+                throw new Error(`Insufficient ETH balance for gas. Required: ${ethers.formatEther(gasCost)} ETH, Available: ${ethers.formatEther(ethBalance)} ETH.`);
             }
 
             // Send USDT transaction
@@ -499,15 +494,15 @@ class USDTService {
                     return res.status(503).json({
                         success: false, 
                         method: "getUSDTInfo", 
-                        error: "Network connection failed",
+                        error: "Network connection failed.",
                         details: error.message
                     });
                 }
 
                 // Create USDT contract instance 
                 const usdtContract = new ethers.Contract(
-                    USDT_CONTRACT_ADDRESS[network],
-                    USDT_ABI,
+                    USDT_CONTRACT_ADDRESS[network], 
+                    USDT_ABI, 
                     provider
                 );
 
@@ -538,8 +533,8 @@ class USDTService {
                     const balance = ethers.formatUnits(rawBalance, decimals);
                     
                     usdtBalance = {
-                        balance: balance,
-                        rawBalance: rawBalance.toString(),
+                        balance: balance, 
+                        rawBalance: rawBalance.toString(), 
                         decimals: decimals
                     };
                 } catch (error) {
@@ -611,16 +606,16 @@ class USDTService {
                                 const txBlock = recentBlocks.find(b => b && b.number === tx.blockNumber);
                                 
                                 return {
-                                    hash: tx.hash,
-                                    from: tx.from,
-                                    to: tx.to || 'Contract Creation',
-                                    value: ethers.formatEther(tx.value),
+                                    hash: tx.hash, 
+                                    from: tx.from, 
+                                    to: tx.to || 'Contract Creation', 
+                                    value: ethers.formatEther(tx.value), 
                                     timestamp: txBlock ? 
                                         new Date(Number(txBlock.timestamp) * 1000).toISOString() : 
-                                        new Date().toISOString(),
-                                    blockNumber: tx.blockNumber ? tx.blockNumber.toString() : null,
-                                    gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : '0',
-                                    gasLimit: tx.gasLimit ? tx.gasLimit.toString() : '0',
+                                        new Date().toISOString(), 
+                                    blockNumber: tx.blockNumber ? tx.blockNumber.toString() : null, 
+                                    gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : '0', 
+                                    gasLimit: tx.gasLimit ? tx.gasLimit.toString() : '0', 
                                     nonce: tx.nonce ? tx.nonce.toString() : '0'
                                 };
                             })
@@ -629,10 +624,10 @@ class USDTService {
                         // Check for USDT transfers using logs
                         try {
                             const usdtContract = new ethers.Contract(
-                                USDT_CONTRACT_ADDRESS[network],
+                                USDT_CONTRACT_ADDRESS[network], 
                                 [
                                     "event Transfer(address indexed from, address indexed to, uint256 value)"
-                                ],
+                                ], 
                                 provider
                             );
                             
@@ -666,13 +661,13 @@ class USDTService {
                                 }
                                 
                                 usdtTransfers.push({
-                                    hash: log.transactionHash,
-                                    from: log.args.from,
-                                    to: log.args.to,
-                                    value: ethers.formatUnits(log.args.value, decimals),
-                                    type: log.args.from.toLowerCase() === address.toLowerCase() ? 'sent' : 'received',
-                                    token: 'USDT',
-                                    blockNumber: log.blockNumber,
+                                    hash: log.transactionHash, 
+                                    from: log.args.from, 
+                                    to: log.args.to, 
+                                    value: ethers.formatUnits(log.args.value, decimals), 
+                                    type: log.args.from.toLowerCase() === address.toLowerCase() ? 'sent' : 'received', 
+                                    token: 'USDT', 
+                                    blockNumber: log.blockNumber, 
                                     timestamp: timestamp
                                 });
                             }
@@ -689,27 +684,29 @@ class USDTService {
                 // Get token balances
                 const tokenBalances = [];
                 tokenBalances.push({
-                    token: 'USDT',
-                    balance: usdtBalance.balance,
-                    rawBalance: usdtBalance.rawBalance,
-                    decimals: usdtBalance.decimals
+                    token: 'USDT', 
+                    balance: usdtBalance.balance, 
+                    rawBalance: usdtBalance.rawBalance, 
+                    decimals: usdtBalance.decimals 
                 });
 
                 res.status(200).json({
                     success: true, 
                     method: "getUSDTInfo", 
-                    address, 
-                    network: isTestnet ? "sepolia" : "mainnet",
-                    usdt: usdtBalance,
-                    eth: {
-                        balance: ethers.formatEther(ethBalance),
-                        rawBalance: ethBalance.toString()
-                    },
-                    txCount: txCount.toString(),
-                    recentTransactions: recentTransactions,
-                    usdtTransfers: usdtTransfers,
-                    tokenBalances: tokenBalances,
-                    lastUpdated: new Date().toISOString()
+                    data: {
+                        address, 
+                        network: isTestnet ? "sepolia" : "mainnet", 
+                        usdt: usdtBalance, 
+                        eth: {
+                            balance: ethers.formatEther(ethBalance), 
+                            rawBalance: ethBalance.toString() 
+                        }, 
+                        txCount: txCount.toString(), 
+                        recentTransactions: recentTransactions, 
+                        usdtTransfers: usdtTransfers, 
+                        tokenBalances: tokenBalances, 
+                        lastUpdated: new Date().toISOString()
+                    }
                 });
 
             } catch(error) {

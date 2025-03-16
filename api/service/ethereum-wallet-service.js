@@ -12,31 +12,31 @@ class EthereumWalletService {
 		// Define network configurations with your API key
 		this.networks = {
 			mainnet: {
-				rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-				chainId: 1,
-				name: 'mainnet',
+				rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`, 
+				chainId: 1, 
+				name: 'mainnet', 
 				etherscanApi: 'https://api.etherscan.io/api'
-			},
+			}, 
 			sepolia: {
-				rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-				chainId: 11155111,
-				name: 'sepolia',
-				etherscanApi: 'https://api-sepolia.etherscan.io/api'
+				rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`, 
+				chainId: 11155111, 
+				name: 'sepolia', 
+				etherscanApi: 'https://api-sepolia.etherscan.io/api' 
 			},
 			goerli: {
-				rpcUrl: `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-				chainId: 5,
-				name: 'goerli',
+				rpcUrl: `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_API_KEY}`, 
+				chainId: 5, 
+				name: 'goerli', 
 				etherscanApi: 'https://api-goerli.etherscan.io/api'
 			}
 		};
     
 		// Add retry options to the provider
 		this.providerOptions = {
-		polling: true,
-		pollingInterval: 4000, // 4 seconds
-		maxRetries: 5,
-		retryDelay: 1000, // 1 second
+			polling: true, 
+			pollingInterval: 4000, // 4 seconds
+			maxRetries: 5, 
+			retryDelay: 1000, // 1 second
 		};
 		
 		// Default API key - replace with your own
@@ -53,7 +53,7 @@ class EthereumWalletService {
 	initializeProvider(networkName) {
 		const network = this.networks[networkName];
 		if (!network) {
-			throw new Error(`Unsupported network: ${networkName}`);
+			throw new Error(`Unsupported network: ${networkName}.`);
 		}
 		
 		try {
@@ -61,9 +61,9 @@ class EthereumWalletService {
 			this.provider = new ethers.JsonRpcProvider(
 				network.rpcUrl,
 				{
-				chainId: network.chainId,
-				name: network.name,
-				...this.providerOptions
+					chainId: network.chainId,
+					name: network.name,
+					...this.providerOptions
 				}
 			);
 			
@@ -75,7 +75,7 @@ class EthereumWalletService {
 			this.currentNetwork = networkName;
 		} catch (error) {
 			console.error(`Failed to initialize provider for ${networkName}:`, error);
-			throw new Error(`Provider initialization failed: ${error.message}`);
+			throw new Error(`Provider initialization failed: ${error.message}.`);
 		}
 	}
 
@@ -84,20 +84,22 @@ class EthereumWalletService {
 	 	* @param {string} network - Network name ('mainnet', 'sepolia', 'goerli', etc.)
 	 	* @param {string} customRpcUrl - Optional custom RPC URL
 	*/
-	setNetwork(network = 'sepolia', customRpcUrl = null) {
+	setNetwork(network = null, customRpcUrl = null) {
 		try {
+			network = this.currentNetwork;
+
 			if (customRpcUrl) {
 				// If custom RPC URL is provided, use it with the network's chain ID
 				const networkConfig = this.networks[network];
 				if (!networkConfig) {
-					throw new Error(`Unsupported network: ${network}`);
+					throw new Error(`Unsupported network: ${network}.`);
 				}
 				
 				this.provider = new ethers.JsonRpcProvider(
 					customRpcUrl,
 					{
-						chainId: networkConfig.chainId,
-						name: networkConfig.name,
+						chainId: networkConfig.chainId, 
+						name: networkConfig.name, 
 						...this.providerOptions
 					}
 				);
@@ -115,7 +117,7 @@ class EthereumWalletService {
 			this.initializeProvider(network);
 		} catch (error) {
 			console.error(`Failed to set network to ${network}:`, error);
-			throw new Error(`Network change failed: ${error.message}`);
+			throw new Error(`Network change failed: ${error.message}.`);
 		}
 	}
 
@@ -133,15 +135,15 @@ class EthereumWalletService {
 			const wallet = ethers.Wallet.createRandom();
 
 			return {
-				address: wallet.address,
-				privateKey: wallet.privateKey,
-				mnemonic: wallet.mnemonic.phrase,
-				path: wallet.mnemonic.path,
+				address: wallet.address, 
+				privateKey: wallet.privateKey, 
+				mnemonic: wallet.mnemonic.phrase, 
+				path: wallet.mnemonic.path, 
 				network: targetNetwork // Specify the intended network
 			};
 		} catch (error) {
 			console.error("Error generating Ethereum wallet:", error);
-			throw new Error(`Failed to generate wallet: ${error.message}`);
+			throw new Error(`Failed to generate wallet: ${error.message}.`);
 		}
   	}
 
@@ -184,6 +186,7 @@ class EthereumWalletService {
 						res.status(200).json({
 							success: true, 
 							method: "getETHWalletBalance", 
+							message: `Successfully viewed Ethereum wallet balance for ${address}`, 
 							data: {
 								address,
 								balanceWei: balanceWei.toString(),
@@ -201,18 +204,18 @@ class EthereumWalletService {
 					}
 				}
 		
-				console.error("Wallet balance error:", error);
+				console.error("Ethereum Wallet balance error:", error);
 				res.status(422).json({
 					success: false, 
 					method: "getETHWalletBalance", 
-					error: lastError || new Error("Failed to get balance after multiple attempts")
+					error: lastError || new Error("Failed to get balance after multiple attempts.")
 				});
 			} catch (error) {
 				console.error("Error getting Ethereum wallet balance:", error);
 				res.status(500).json({
 					success: false, 
 					method: "getETHWalletBalance", 
-					error: error.message || "An error occurred while fetching wallet balance", 
+					error: error.message || "An error occurred while fetching wallet balance.", 
 					details: `Failed to get wallet balance: ${error.message}`
 				});
 			}
@@ -272,31 +275,31 @@ class EthereumWalletService {
 					if (this.etherscanApiKey) {
 						const transactionsResponse = await axios.get(etherscanApi, {
 							params: {
-								module: 'account',
-								action: 'txlist',
-								address: address,
-								startblock: 0,
-								endblock: 99999999,
-								page: 1,
+								module: 'account', 
+								action: 'txlist', 
+								address: address, 
+								startblock: 0, 
+								endblock: 99999999, 
+								page: 1, 
 								offset: 10, // Get last 10 transactions
-								sort: 'desc',
+								sort: 'desc', 
 								apikey: this.etherscanApiKey
-							},
+							}, 
 							timeout: 5000 // 5 second timeout
 						});
 
 						// Format transactions
 						if (transactionsResponse.data && transactionsResponse.data.status === '1') {
 							transactions = transactionsResponse.data.result.map(tx => ({
-								hash: tx.hash,
-								from: tx.from,
-								to: tx.to,
-								value: ethers.formatEther(tx.value),
-								gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'),
-								gasUsed: tx.gasUsed,
-								blockNumber: tx.blockNumber,
-								timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
-								isError: tx.isError === '1',
+								hash: tx.hash, 
+								from: tx.from, 
+								to: tx.to, 
+								value: ethers.formatEther(tx.value), 
+								gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'), 
+								gasUsed: tx.gasUsed, 
+								blockNumber: tx.blockNumber, 
+								timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(), 
+								isError: tx.isError === '1', 
 								confirmations: tx.confirmations
 							}));
 						}
@@ -310,6 +313,7 @@ class EthereumWalletService {
 				res.status(200).json({
 					success: true, 
 					method: "getETHWalletInfo", 
+					message: `Successfully listed Ethereum wallet info for ${address}`, 
 					data: {
 						address, 
 						network, 
@@ -366,7 +370,7 @@ class EthereumWalletService {
 		
 			// Check if sender has enough balance
 			if (balanceWei < amountWei) {
-				throw new Error(`Insufficient balance. Available: ${ethers.formatEther(balanceWei)} ETH, Required: ${amountToSend} ETH`);
+				throw new Error(`Insufficient balance. Available: ${ethers.formatEther(balanceWei)} ETH, Required: ${amountToSend} ETH.`);
 			}
 
 			// Get current gas price with retry logic
@@ -376,7 +380,7 @@ class EthereumWalletService {
 
 				// Ensure fee data is valid
 				if (!feeData) {
-					throw new Error("Invalid fee data received from provider");
+					throw new Error("Invalid fee data received from provider.");
 				}
 			} catch (error) {
 				console.error("Error getting fee data:", error);
@@ -396,8 +400,8 @@ class EthereumWalletService {
 		
 			// Create transaction object
 			const tx = {
-				to: receiverAddress,
-				value: amountWei,
+				to: receiverAddress, 
+				value: amountWei, 
 				gasLimit: options.gasLimit || 21000, // Standard gas limit for ETH transfer
 				nonce: nonce // 
 			};
@@ -498,33 +502,33 @@ class EthereumWalletService {
 						to: receiverAddress, 
 						amount: amountToSend, 
 						gasUsed: gasUsed, 
-						effectiveGasPrice: effectiveGasPrice, 
+						effectiveGasPrice: effectiveGasPrice,  
 						network: this.currentNetwork
 					};
 				} catch (error) {
 				  console.error("Error waiting for transaction confirmation:", error);
 				  // Return partial success info since the transaction was sent but confirmation failed
 				  	return {
-						success: true,
-						txid: transaction.hash,
-						senderWalletAddress: senderAddress,
-						to: receiverAddress,
-						amount: amountToSend,
-						network: this.currentNetwork,
-						confirmationError: error.message,
+						success: true, 
+						txid: transaction.hash, 
+						senderWalletAddress: senderAddress, 
+						to: receiverAddress, 
+						amount: amountToSend, 
+						network: this.currentNetwork, 
+						confirmationError: error.message, 
 						pending: true
 				  	};
 				}
 			} else {
 				// Return immediately without waiting for confirmation
 				return {
-					success: true,
-					txid: transaction.hash,
-					senderWalletAddress: senderAddress,
-					to: receiverAddress,
-					amount: amountToSend,
-					nonce: tx.nonce,
-					network: this.currentNetwork,
+					success: true, 
+					txid: transaction.hash, 
+					senderWalletAddress: senderAddress, 
+					to: receiverAddress, 
+					amount: amountToSend, 
+					nonce: tx.nonce, 
+					network: this.currentNetwork, 
 					pending: true
 				};
 			}
@@ -532,7 +536,7 @@ class EthereumWalletService {
 			console.error("Ethereum transaction error:", error);
 			return {
 				success: false,
-				error: "Failed to send Ethereum transaction",
+				error: "Failed to send Ethereum transaction.",
 				details: error.message
 			};
 		}
@@ -555,14 +559,14 @@ class EthereumWalletService {
 			try {
 				feeData = await this.provider.getFeeData();
 				if (!feeData) {
-					throw new Error("Invalid fee data received from provider");
+					throw new Error("Invalid fee data received from provider.");
 				}
 			} catch (error) {
 				console.error("Error getting fee data:", error);
 				// Fallback to reasonable defaults
 				feeData = {
-					maxFeePerGas: ethers.parseUnits("50", "gwei"),
-					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei"),
+					maxFeePerGas: ethers.parseUnits("50", "gwei"), 
+					maxPriorityFeePerGas: ethers.parseUnits("1.5", "gwei"), 
 					gasPrice: ethers.parseUnits("30", "gwei")
 				};
 			}
@@ -571,7 +575,7 @@ class EthereumWalletService {
 			const tx = {
 				to: senderAddress, // Send to self
 				value: 0, // 0 ETH
-				gasLimit: 21000,
+				gasLimit: 21000, 
 				nonce: nonce
 			};
 		
@@ -632,9 +636,9 @@ class EthereumWalletService {
 			}
 			
 			console.log("Sending cancellation transaction with params:", {
-				nonce: tx.nonce,
-				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined,
-				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined,
+				nonce: tx.nonce, 
+				maxFeePerGas: tx.maxFeePerGas ? ethers.formatUnits(tx.maxFeePerGas, "gwei") : undefined, 
+				maxPriorityFeePerGas: tx.maxPriorityFeePerGas ? ethers.formatUnits(tx.maxPriorityFeePerGas, "gwei") : undefined, 
 				gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, "gwei") : undefined
 			});
 			
@@ -651,26 +655,33 @@ class EthereumWalletService {
 				const txHash = receipt.hash || transaction.hash;
 				
 				return {
-					success: true,
-					txid: txHash,
-					blockNumber: blockNumber,
-					message: `Successfully cancelled transaction with nonce ${nonce}`
+					success: true, 
+					method: "cancelETHTransaction", 
+					message: `Successfully cancelled transaction with nonce ${nonce}`, 
+					data: {
+						txid: txHash, 
+						blockNumber: blockNumber
+					}
 				};
 			} catch (error) {
 				console.error("Error waiting for cancellation confirmation:", error);
 				return {
-				success: true,
-				txid: transaction.hash,
-				message: `Cancellation transaction sent with hash ${transaction.hash}, but confirmation failed`,
-				confirmationError: error.message,
-				pending: true
+					success: true, 
+					method: "cancelETHTransaction", 
+					message: `Cancellation transaction sent with hash ${transaction.hash}, but confirmation failed.`, 
+					data: {
+						txid: transaction.hash, 
+						confirmationError: error.message, 
+						pending: true
+					}
 				};
 			}
 		} catch (error) {
 			console.error("Transaction cancellation error:", error);
 			return {
-				success: false,
-				error: "Failed to cancel transaction",
+				success: false, 
+				method: "cancelETHTransaction", 
+				error: "Failed to cancel transaction.", 
 				details: error.message
 			};
 		}
@@ -689,15 +700,16 @@ class EthereumWalletService {
 		try {
 			// Simply call sendEther with the same parameters but higher gas price
 			return await this.sendEther(senderPrivateKey, receiverAddress, amountToSend, {
-				nonce: nonce,
-				feeMultiplier: feeMultiplier,
+				nonce: nonce, 
+				feeMultiplier: feeMultiplier, 
 				waitForConfirmation: true
 			});
 		} catch (error) {
 			console.error("Transaction speed up error:", error);
 			return {
-				success: false,
-				error: "Failed to speed up transaction",
+				success: false, 
+				method: "speedUpETHTransactio", 
+				error: "Failed to speed up transaction.", 
 				details: error.message
 			};
 		}
@@ -711,15 +723,15 @@ class EthereumWalletService {
 	importFromPrivateKey(privateKey) {
 		try {
 			if (!privateKey || typeof privateKey !== 'string') {
-				throw new Error("Invalid private key");
+				throw new Error("Invalid private key.");
 			}
 			
 			// Create wallet from private key
 			const wallet = new ethers.Wallet(privateKey);
 			
 			return {
-				address: wallet.address,
-				privateKey: wallet.privateKey,
+				address: wallet.address, 
+				privateKey: wallet.privateKey, 
 				network: this.currentNetwork
 			};
 		} catch (error) {
@@ -737,17 +749,17 @@ class EthereumWalletService {
 	importFromMnemonic(mnemonic, path = "m/44'/60'/0'/0/0") {
 		try {
 			if (!mnemonic || typeof mnemonic !== 'string') {
-				throw new Error("Invalid mnemonic phrase");
+				throw new Error("Invalid mnemonic phrase.");
 			}
 		
 			// Create wallet from mnemonic
 			const wallet = ethers.Wallet.fromPhrase(mnemonic, path);
 		
 			return {
-				address: wallet.address,
-				privateKey: wallet.privateKey,
-				mnemonic: mnemonic,
-				path: path,
+				address: wallet.address, 
+				privateKey: wallet.privateKey, 
+				mnemonic: mnemonic, 
+				path: path, 
 				network: this.currentNetwork
 			};
 		} catch (error) {
