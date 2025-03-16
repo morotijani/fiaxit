@@ -13,7 +13,7 @@ const ECPair = ECPairFactory(ecc);
 class BitcoinWalletService {
 	constructor() {
 		// Default to testnet, can be changed to bitcoin.networks.bitcoin for mainnet
-		this.network = bitcoin.networks.testnet;
+		this.network = (process.env.NODE_ENV === 'production' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet);
 		
 		// BlockCypher API endpoints
 		this.apiEndpoints = {
@@ -27,9 +27,11 @@ class BitcoinWalletService {
 	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
 	   * @returns {Object} Wallet information including address and private key
 	*/
-	generateWallet(isTestnet = true) {
+	generateWallet() {
 		try {
-			// Set network based on isTestnet parameter
+			const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
+
+			// Set network based on isTestnet
 			this.network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
 			
 			// Generate a random mnemonic (seed phrase)
@@ -65,7 +67,7 @@ class BitcoinWalletService {
 			};
 		} catch (error) {
 		  	console.error("Error generating Bitcoin wallet:", error);
-		  	throw new Error(`Failed to generate wallet: ${error.message}`);
+		  	throw new Error(`Failed to generate Bitcoin wallet: ${error.message}`);
 		}
 	}
 
@@ -87,23 +89,23 @@ class BitcoinWalletService {
 		try {
 			// Validate inputs
 			if (!senderPrivateKey || !receiverAddress || !amountToSend) {
-				throw new Error("Missing required parameters");
+				throw new Error("Missing required parameters.");
 			}
 
 			// Validate private key format
 			if (!senderPrivateKey || typeof senderPrivateKey !== 'string') {
-				throw new Error("Invalid private key: must be a non-empty string");
+				throw new Error("Invalid private key: must be a non-empty string.");
 			}
 
 			// Validate recipient address
 			if (!this.isValidBitcoinAddress(receiverAddress, isTestnet)) {
-				throw new Error("Invalid recipient Bitcoin address");
+				throw new Error("Invalid recipient Bitcoin address.");
 			}
 			
 			// Convert BTC to satoshis
 			const satoshiToSend = Math.round(amountToSend * 100000000);
 			if (satoshiToSend <= 0) {
-				throw new Error("Amount must be greater than 0");
+				throw new Error("Amount must be greater than 0.");
 			}
 
 			// Import the private key with proper error handling
@@ -116,8 +118,8 @@ class BitcoinWalletService {
 
 			// Get the sender's address
 			const { address: fromAddress } = bitcoin.payments.p2pkh({
-				pubkey: keyPair.publicKey,
-				network: this.network
+				pubkey: keyPair.publicKey, 
+				network: this.network 
 			});
 			
 			console.log(`Sending from address: ${fromAddress}`);
@@ -129,8 +131,8 @@ class BitcoinWalletService {
 			
 			// Get UTXOs for the address
 			const utxoResponse = await axios({
-				method: "GET",
-				url: `${networkBaseUrl}/address/${fromAddress}/utxo`,
+				method: "GET", 
+				url: `${networkBaseUrl}/address/${fromAddress}/utxo`, 
 				timeout: 5000 // Add timeout for API calls
 			});
 			
@@ -147,10 +149,10 @@ class BitcoinWalletService {
 			// getting balance on address
 			for (const utxo of utxos) {
 				inputs.push({
-					satoshis: utxo.value,
-					script: bitcore.Script.buildPublicKeyHashOut(fromAddress).toHex(),
-					address: fromAddress,
-					txId: utxo.txid,
+					satoshis: utxo.value, 
+					script: bitcore.Script.buildPublicKeyHashOut(fromAddress).toHex(), 
+					address: fromAddress, 
+					txId: utxo.txid, 
 					outputIndex: utxo.vout
 				});
 				totalAmountAvailable += utxo.value;
@@ -183,7 +185,7 @@ class BitcoinWalletService {
 			
 			// Check if we have enough funds
 			if (totalAmountAvailable - satoshiToSend - fee < 0) {
-				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable/100000000} BTC, Required: ${(satoshiToSend + fee)/100000000} BTC, Fee: ${fee/100000000} BTC`);
+				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable/100000000} BTC, Required: ${(satoshiToSend + fee)/100000000} BTC, Fee: ${fee/100000000} BTC.`);
 			}
 			
 			// Create and sign transaction
@@ -197,7 +199,7 @@ class BitcoinWalletService {
 			// Verify transaction is valid
 			const isValid = transaction.isFullySigned();
 			if (!isValid) {
-				throw new Error("Transaction failed validation");
+				throw new Error("Transaction failed validation.");
 			}
 			
 			// Serialize and broadcast transaction 
@@ -205,9 +207,9 @@ class BitcoinWalletService {
 			const serializedTransaction = transaction.serialize();
 			
 			const broadcastResponse = await axios({
-				method: "POST",
-				url: `${networkBaseUrl}/tx`,
-				data: serializedTransaction,
+				method: "POST", 
+				url: `${networkBaseUrl}/tx`, 
+				data: serializedTransaction, 
 				timeout: 10000
 			});
 			
@@ -219,7 +221,7 @@ class BitcoinWalletService {
 		} catch (error) {
 			console.error("Bitcoin transaction error:", error.message);
 			return {
-				error: "Failed to send Bitcoin transaction",
+				error: "Failed to send Bitcoin transaction.",
 				details: error.message
 			};
 		}
@@ -230,7 +232,8 @@ class BitcoinWalletService {
         return async (req, res, next) => {
             try {
                 const walletAddress = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+				const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
+
                 if (!walletAddress) {
                     return res.status(400).json({
                         success: false,
@@ -276,6 +279,7 @@ class BitcoinWalletService {
                 res.status(200).json({
                     success: true,
                     method: "getBitcoinWalletBalance", 
+					message: `Successfully viewed Bitcoin wallet balance for ${walletAddress}`, 
                     data: {
                         address: walletAddress,
                         network: isTestnet ? 'testnet' : 'mainnet',
@@ -294,11 +298,13 @@ class BitcoinWalletService {
                         }
                     }
                 });
-            } catch(err) {
-                console.error("Wallet balance error:", err);
+            } catch(error) {
+                console.error("Wallet balance error:", error);
                 res.status(500).json({
-                    success: false,
-                    error: err.message || "An error occurred while fetching wallet balance"
+                    success: false, 
+					method: "getBitcoinWalletBalance", 
+                    error: "An error occurred while fetching wallet balance.", 
+					details: `Failed to get Bitcoin wallet balance: ${error.message}`
                 });
             }
         }
@@ -315,17 +321,22 @@ class BitcoinWalletService {
 		return async (req, res, next) => {
 			try {
 				const address = req.params.address;
-				const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+				const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
 				if (!address) {
 					return res.status(400).json({
-						success: false,
-						error: "Wallet address is required"
+						success: false, 
+						method: "getBitcoinWalletInfo", 
+						error: "Bitcoin Wallet address is required."
 					});
 				}
 
 				// Validate Bitcoin address
 				if (!this.isValidBitcoinAddress(address, isTestnet)) {
-					throw new Error("Invalid Bitcoin address");
+					return res.status(400).json({
+						success: false, 
+						method: "getBitcoinWalletInfo", 
+						error: "Invalid Bitcoin wallet address."
+					});
 				}
 				
 				const network = isTestnet ? 'testnet' : 'mainnet';
@@ -362,7 +373,7 @@ class BitcoinWalletService {
 						// Calculate the change amount
 						const totalOut = tx.outputs.reduce((sum, output) => {
 							if (output.addresses && !output.addresses.includes(address)) {
-							return sum + output.value;
+								return sum + output.value;
 							}
 							return sum;
 						}, 0);
@@ -376,7 +387,7 @@ class BitcoinWalletService {
 							if (output.addresses && !output.addresses.includes(address)) {
 								return sum + output.value;
 							}
-								return sum;
+							return sum;
 						}, 0);
 						
 						amount = -totalOut;
@@ -393,19 +404,19 @@ class BitcoinWalletService {
 					}
 					
 					return {
-						txid: tx.hash,
-						type,
+						txid: tx.hash, 
+						type, 
 						amount: amount / 100000000, // Convert satoshis to BTC
-						fee: tx.fees / 100000000,
-						confirmations: tx.confirmations || 0,
-						blockHeight: tx.block_height || null,
-						timestamp: tx.received ? new Date(tx.received).toISOString() : null,
+						fee: tx.fees / 100000000, 
+						confirmations: tx.confirmations || 0, 
+						blockHeight: tx.block_height || null, 
+						timestamp: tx.received ? new Date(tx.received).toISOString() : null, 
 						inputs: tx.inputs.map(input => ({
-							addresses: input.addresses || [],
+							addresses: input.addresses || [], 
 							value: input.output_value ? input.output_value / 100000000 : 0
-						})),
+						})), 
 						outputs: tx.outputs.map(output => ({
-							addresses: output.addresses || [],
+							addresses: output.addresses || [], 
 							value: output.value ? output.value / 100000000 : 0
 						}))
 					};
@@ -413,26 +424,30 @@ class BitcoinWalletService {
 				
 				res.status(200).json({
 					success: true, 
-					address, 
-					network, 
-					balance: {
-						confirmed: data.balance / 100000000, // Convert satoshis to BTC
-						unconfirmed: data.unconfirmed_balance / 100000000, 
-						total: (data.balance + data.unconfirmed_balance) / 100000000
-					}, 
-					transactions, 
-					txCount: data.n_tx, 
-					totalReceived: data.total_received / 100000000, 
-					totalSent: data.total_sent / 100000000, 
-					lastUpdated: new Date().toISOString()
+					method: "getBitcoinWalletInfo", 
+					message: `Successfully listed Bitcoin wallet info for ${address}`, 
+					data: {
+						address, 
+						network, 
+						balance: {
+							confirmed: data.balance / 100000000, // Convert satoshis to BTC
+							unconfirmed: data.unconfirmed_balance / 100000000, 
+							total: (data.balance + data.unconfirmed_balance) / 100000000
+						}, 
+						transactions, 
+						txCount: data.n_tx, 
+						totalReceived: data.total_received / 100000000, 
+						totalSent: data.total_sent / 100000000, 
+						lastUpdated: new Date().toISOString() 
+					}
 				});
 			} catch (error) {
 				console.error("Error getting Bitcoin wallet info:", error);
 				res.status(422).json({
-					success: false,
+					success: false, 
 					method: "getBitcoinWalletInfo", 
-					error: "Failed to BTC get wallet info",
-					details: error.message || "An error occurred while fetching wallet balance"
+					error: "Failed to Bitcoin get wallet info.", 
+					details: error.message || "An error occurred while fetching Bitcoin wallet balance."
 				});
 			}
 		}
@@ -444,7 +459,7 @@ class BitcoinWalletService {
 	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
 	   * @returns {boolean} Whether the address is valid
 	*/
-	isValidBitcoinAddress(address, isTestnet = true) {
+	isValidBitcoinAddress(address, isTestnet) {
 		try {
 			const network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
 		

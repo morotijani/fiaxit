@@ -4,7 +4,7 @@ const axios = require('axios');
 class EthereumWalletService {
 	constructor() {
 		// Initialize with a default network
-		this.currentNetwork = 'sepolia';
+		this.currentNetwork = (process.env.NODE_ENV === 'production' ? 'mainnet' : 'sepolia')
 		
 		// Your Alchemy API key
 		const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
@@ -86,8 +86,6 @@ class EthereumWalletService {
 	*/
 	setNetwork(network = null, customRpcUrl = null) {
 		try {
-			network = this.currentNetwork;
-
 			if (customRpcUrl) {
 				// If custom RPC URL is provided, use it with the network's chain ID
 				const networkConfig = this.networks[network];
@@ -208,15 +206,15 @@ class EthereumWalletService {
 				res.status(422).json({
 					success: false, 
 					method: "getETHWalletBalance", 
-					error: lastError || new Error("Failed to get balance after multiple attempts.")
+					error: lastError || "Failed to get balance after multiple attempts."
 				});
 			} catch (error) {
 				console.error("Error getting Ethereum wallet balance:", error);
 				res.status(500).json({
 					success: false, 
 					method: "getETHWalletBalance", 
-					error: error.message || "An error occurred while fetching wallet balance.", 
-					details: `Failed to get wallet balance: ${error.message}`
+					error: "An error occurred while fetching wallet balance.", 
+					details: `Failed to get Ethereum wallet balance: ${error.message}`
 				});
 			}
 		}
