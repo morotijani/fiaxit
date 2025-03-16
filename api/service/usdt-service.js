@@ -111,7 +111,6 @@ class USDTService {
         * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
         * @returns {Promise<Object>} Balance information
     */
-
     getWalletBalance = () => {
         return async(req, res, next) => {
             try {
@@ -121,6 +120,7 @@ class USDTService {
                 if (!address) {
                     return res.status(400).json({
                         success: false,
+                        method: "getUSDTBalance", 
                         error: "Address parameter is required"
                     });
                 }
@@ -475,14 +475,16 @@ class USDTService {
                 
                 if (!address) {
                     return res.status(400).json({
-                        success: false,
+                        success: false, 
+                        method: "getUSDTInfo", 
                         error: "Address parameter is required."
                     });
                 }
 
                 if (!ethers.isAddress(address)) {
                     return res.status(400).json({
-                        success: false,
+                        success: false, 
+                        method: "getUSDTInfo", 
                         error: "Invalid Ethereum address"
                     });
                 }
@@ -495,7 +497,8 @@ class USDTService {
                     provider = await createProvider(network);
                 } catch (error) {
                     return res.status(503).json({
-                        success: false,
+                        success: false, 
+                        method: "getUSDTInfo", 
                         error: "Network connection failed",
                         details: error.message
                     });
@@ -693,7 +696,8 @@ class USDTService {
                 });
 
                 res.status(200).json({
-                    success: true,
+                    success: true, 
+                    method: "getUSDTInfo", 
                     address, 
                     network: isTestnet ? "sepolia" : "mainnet",
                     usdt: usdtBalance,
@@ -712,14 +716,13 @@ class USDTService {
                 console.error("Error getting wallet info:", error);
                 res.status(500).json({
                     success: false, 
-                    error: "Failed to get wallet info",
+                    method: "getUSDTInfo", 
+                    error: "Failed to get wallet info.",
                     details: error.message
                 });
             }
         }
     }
-
-    
 }
 
 module.exports = new USDTService();
