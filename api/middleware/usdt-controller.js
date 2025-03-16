@@ -1,48 +1,6 @@
 const USDTService = require('../service/usdt-service');
 
 class USDTController {
-    /**
-        * Get USDT balance for an address
-    */
-    getBalance = () => {
-        return async (req, res) => {
-            try {
-                const address = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
-                if (!address) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Address parameter is required"
-                    });
-                }
-                
-                const balance = await USDTService.getUSDTBalance(address, isTestnet);
-                
-                if (balance.error) {
-                    return res.status(400).json({
-                        success: false,
-                        error: balance.error,
-                        details: balance.details
-                    });
-                }
-                
-                res.status(200).json({
-                    success: true,
-                    method: "getUSDTBalance",
-                    data: balance
-                });
-            } catch (error) {
-                console.error("Balance check error:", error);
-                res.status(500).json({
-                    success: false,
-                    method: "getUSDTBalance",
-                    error: "Failed to get balance",
-                    details: error.message
-                });
-            }
-        };
-    };
 
     /**
         * Send USDT from one address to another
@@ -112,51 +70,6 @@ class USDTController {
                 res.status(500).json({
                     success: false,
                     error: "Failed to send USDT",
-                    details: error.message
-                });
-            }
-        };
-    };
-
-
-    /**
-        * Get detailed wallet information
-    */
-    getWalletInfo = () => {
-        return async (req, res) => {
-            try {
-                const address = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
-                if (!address) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Address parameter is required"
-                    });
-                }
-                
-                const walletInfo = await USDTService.getWalletInfo(address, isTestnet);
-                
-                if (!walletInfo.success) {
-                    return res.status(400).json({
-                        success: false,
-                        error: walletInfo.error,
-                        details: walletInfo.details
-                    });
-                }
-            
-                res.status(200).json({
-                    success: true,
-                    method: "getUSDTWalletInfo",
-                    data: walletInfo
-                });
-                
-            } catch (error) {
-                console.error("Wallet info error:", error);
-                res.status(500).json({
-                    success: false, 
-                    method: "getUSDTWalletInfo",
-                    error: "Failed to get wallet information",
                     details: error.message
                 });
             }

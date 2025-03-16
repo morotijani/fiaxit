@@ -202,7 +202,7 @@ class EthereumWalletService {
 					}
 				}
 		
-				console.error("Ethereum Wallet balance error:", error);
+				console.error("Ethereum Wallet balance error:", lastError);
 				res.status(422).json({
 					success: false, 
 					method: "getETHWalletBalance", 

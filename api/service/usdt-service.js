@@ -474,7 +474,7 @@ class USDTService {
                 if (!address) {
                     return res.status(400).json({
                         success: false, 
-                        method: "getUSDTInfo", 
+                        method: "getUSDTWalletInfo", 
                         error: "Address parameter is required."
                     });
                 }
@@ -482,7 +482,7 @@ class USDTService {
                 if (!ethers.isAddress(address)) {
                     return res.status(400).json({
                         success: false, 
-                        method: "getUSDTInfo", 
+                        method: "getUSDTWalletInfo", 
                         error: "Invalid Ethereum address."
                     });
                 }
@@ -496,7 +496,7 @@ class USDTService {
                 } catch (error) {
                     return res.status(503).json({
                         success: false, 
-                        method: "getUSDTInfo", 
+                        method: "getUSDTWalletInfo", 
                         error: "Network connection failed.",
                         details: error.message
                     });
@@ -695,7 +695,7 @@ class USDTService {
 
                 res.status(200).json({
                     success: true, 
-                    method: "getUSDTInfo", 
+                    method: "getUSDTWalletInfo", 
                     message: `Successfully listed USDT wallet info for ${address}`, 
                     data: {
                         address, 
@@ -717,7 +717,7 @@ class USDTService {
                 console.error("Error getting wallet info:", error);
                 res.status(500).json({
                     success: false, 
-                    method: "getUSDTInfo", 
+                    method: "getUSDTWalletInfo", 
                     error: "Failed to get wallet info.",
                     details: error.message
                 });
