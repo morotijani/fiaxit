@@ -108,8 +108,8 @@ class USDTService {
         return async(req, res, next) => {
             try {
                 const address = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
+                const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
+
                 if (!address) {
                     return res.status(400).json({
                         success: false, 
@@ -185,6 +185,7 @@ class USDTService {
                 res.status(200).json({
                     success: true, 
                     method: "getUSDTBalance", 
+                    message: `Successfully viewed USDT wallet balance for ${address}`, 
                     data: {
                         address, 
                         network: isTestnet ? "sepolia" : "mainnet", 
@@ -319,8 +320,10 @@ class USDTService {
     //     }
     // }
 
-    async SendUSDT(senderPrivateKey, receiverAddress, amount, isTestnet = true) {
+    async SendUSDT(senderPrivateKey, receiverAddress, amount) {
         try {
+            const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
+
             if (!senderPrivateKey || !receiverAddress || !amount) {
                 throw new Error("Missing required parameters.");
             }
@@ -466,7 +469,7 @@ class USDTService {
         return async (req, res, next) => {
             try {
                 const address = req.params.address;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
+				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
                 
                 if (!address) {
                     return res.status(400).json({
@@ -480,7 +483,7 @@ class USDTService {
                     return res.status(400).json({
                         success: false, 
                         method: "getUSDTInfo", 
-                        error: "Invalid Ethereum address"
+                        error: "Invalid Ethereum address."
                     });
                 }
 
@@ -693,6 +696,7 @@ class USDTService {
                 res.status(200).json({
                     success: true, 
                     method: "getUSDTInfo", 
+                    message: `Successfully listed USDT wallet info for ${address}`, 
                     data: {
                         address, 
                         network: isTestnet ? "sepolia" : "mainnet", 
