@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const USDTController = require('../middleware/usdt-controller')
-const ethereumController = require('../middleware/ethereum-controller');
 const TransactionsController = require("../controllers/transaction-controller");
 
 // Routes
@@ -15,7 +14,7 @@ const TransactionsController = require("../controllers/transaction-controller");
 // }
 router.post('/usdt/send', USDTController.sendUSDT()); // send usdt
 
-// Usage (example): GET /api/v1/transactions/send?testnet=false
+// Usage (example): POST /api/v1/btc/send
 /** BODY
     {
         "crypto_id": "1",
@@ -29,7 +28,7 @@ router.post('/usdt/send', USDTController.sendUSDT()); // send usdt
         "note": "good transaction"
     }
 */
-router.post('/send', TransactionsController.create()); // send transaction (send crypto)
+router.post('/btc/send', TransactionsController.create()); // send transaction (send crypto)
 
 // Usage (example): POST /api/v1/eth/send
 /** BODY

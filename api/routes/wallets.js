@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const WalletsController = require("../controllers/wallet-controller");
-const USDTController = require('../middleware/usdt-controller');
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const USDTService = require('../service/usdt-service');
-const ethereumController = require('../middleware/ethereum-controller');
+const EthereumWalletService = require('../service/ethereum-wallet-service')
 
 // Usage (example): POST /api/v1/wallets/:crypto/generate?testnet=true(default is true) | (on ETH you can provide your network eg: ?network=networkname)
 router.post('/:crypto/generate', WalletsController.generateWallet()); // generate wallet address
@@ -26,11 +25,11 @@ router.get('/btc/:address/balance', BitcoinWalletService.getWalletBalance()); //
 
 /** ETH */ 
 // Usage (example): GET /api/v1/wallets/eth/:address/balance
-router.get('/eth/:address/balance', ethereumController.getWalletBalance); // get eth balance
+router.get('/eth/:address/balance', EthereumWalletService.getWalletBalance()); // get eth balance
 // Usage (example): GET /api/v1/wallets/eth/:address/info
-router.get('/eth/:address/info', ethereumController.getWalletInfo); // get eth wallet info
+router.get('/eth/:address/info', EthereumWalletService.getWalletInfo()); // get eth wallet info
 // Usage (example): GET /api/v1/wallets/eth/:address/validate
-router.get('/eth/:address/validate', ethereumController.validateAddress); // validate eth address
+router.get('/eth/:address/validate', WalletsController.validateETHAddress); // validate eth address
 
 
 // Usage (example): GET /api/v1/wallets

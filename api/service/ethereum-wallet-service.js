@@ -150,42 +150,72 @@ class EthereumWalletService {
 	 	* @param {string} address - Ethereum address
 	 	* @returns {Promise<Object>} Balance information
 	*/
-	async getWalletBalance(address) {
-		try {
-			if (!this.isValidEthereumAddress(address)) {
-				throw new Error("Invalid Ethereum address");
-			}
-
-			// Add retry logic
-			let attempts = 0;
-			const maxAttempts = 3;
-			let lastError;
+	getWalletBalance = () => {
+		return async (req, res, next) => {
+			try {
+				const address = req.params.address;
 			
-			while (attempts < maxAttempts) {
-				try {
-					const balanceWei = await this.provider.getBalance(address);
-					const balanceEth = ethers.formatEther(balanceWei);
-
-					return {
-						address,
-						balanceWei: balanceWei.toString(),
-						balanceEth,
-						network: this.currentNetwork
-					};
-				} catch (error) {
-					lastError = error;
-					attempts++;
-					if (attempts === maxAttempts) break;
-
-					// Exponential backoff
-					await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+				if (!address) {
+					return res.status(400).json({
+						success: false, 
+						method: "getETHWalletBalance", 
+						error: "Wallet address is required."
+					});
 				}
+
+				if (!this.isValidEthereumAddress(address)) {
+					return res.status(400).json({
+						success: false, 
+						method: "getETHWalletBalance", 
+						error: "Invalid Ethereum address format."
+					});
+				}
+
+				// Add retry logic
+				let attempts = 0;
+				const maxAttempts = 3;
+				let lastError;
+				
+				while (attempts < maxAttempts) {
+					try {
+						const balanceWei = await this.provider.getBalance(address);
+						const balanceEth = ethers.formatEther(balanceWei);
+
+						res.status(200).json({
+							success: true, 
+							method: "getETHWalletBalance", 
+							data: {
+								address,
+								balanceWei: balanceWei.toString(),
+								balanceEth,
+								network: this.currentNetwork
+							}
+						});
+					} catch (error) {
+						lastError = error;
+						attempts++;
+						if (attempts === maxAttempts) break;
+
+						// Exponential backoff
+						await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+					}
+				}
+		
+				console.error("Wallet balance error:", error);
+				res.status(422).json({
+					success: false, 
+					method: "getETHWalletBalance", 
+					error: lastError || new Error("Failed to get balance after multiple attempts")
+				});
+			} catch (error) {
+				console.error("Error getting Ethereum wallet balance:", error);
+				res.status(500).json({
+					success: false, 
+					method: "getETHWalletBalance", 
+					error: error.message || "An error occurred while fetching wallet balance", 
+					details: `Failed to get wallet balance: ${error.message}`
+				});
 			}
-      
-      		throw lastError || new Error("Failed to get balance after multiple attempts");
-		} catch (error) {
-			console.error("Error getting Ethereum wallet balance:", error);
-			throw new Error(`Failed to get wallet balance: ${error.message}`);
 		}
 	}
 
@@ -194,93 +224,113 @@ class EthereumWalletService {
 		* @param {string} address - Ethereum address
 		* @returns {Promise<Object>} Wallet information
    	*/
-	async getWalletInfo(address) {
-		try {
-			if (!this.isValidEthereumAddress(address)) {
-				throw new Error("Invalid Ethereum address");
-			}
-
-			// Get current network
-			const network = this.currentNetwork;
-			const etherscanApi = this.networks[network].etherscanApi;
-
-			// Get balance with retry logic
-			let balanceInfo;
+	getWalletInfo = () => {
+		return async (req, res) => {
 			try {
-				balanceInfo = await this.getWalletBalance(address);
-			} catch (error) {
-				console.error("Error getting balance:", error);
-				balanceInfo = { balanceWei: "0", balanceEth: "0" };
-			}
-
-			// Get transaction count (nonce) with retry
-			let transactionCount = 0;
-			try {
-				transactionCount = await this.provider.getTransactionCount(address);
-			} catch (error) {
-				console.error("Error getting transaction count:", error);
-			}
-
-			// Get transactions from Etherscan API
-			let transactions = [];
-			try {
-				if (this.etherscanApiKey) {
-					const transactionsResponse = await axios.get(etherscanApi, {
-						params: {
-							module: 'account',
-							action: 'txlist',
-							address: address,
-							startblock: 0,
-							endblock: 99999999,
-							page: 1,
-							offset: 10, // Get last 10 transactions
-							sort: 'desc',
-							apikey: this.etherscanApiKey
-						},
-						timeout: 5000 // 5 second timeout
+				const address = req.params.address;
+				
+				if (!address) {
+					return res.status(400).json({
+						success: false, 
+						method: "getETHWalletInfo", 
+						error: "Wallet address is required."
 					});
-
-					// Format transactions
-					if (transactionsResponse.data && transactionsResponse.data.status === '1') {
-						transactions = transactionsResponse.data.result.map(tx => ({
-							hash: tx.hash,
-							from: tx.from,
-							to: tx.to,
-							value: ethers.formatEther(tx.value),
-							gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'),
-							gasUsed: tx.gasUsed,
-							blockNumber: tx.blockNumber,
-							timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
-							isError: tx.isError === '1',
-							confirmations: tx.confirmations
-						}));
-					}
-				} else {
-				console.warn("Etherscan API key not provided. Transaction history unavailable.");
 				}
-			} catch (error) {
-				console.error("Error fetching transaction history:", error);
-			}
 
-			return {
-				success: true, 
-				address, 
-				network, 
-				balance: {
-					wei: balanceInfo.balanceWei, 
-					ether: balanceInfo.balanceEth
-				},
-				transactionCount, 
-				transactions, 
-				lastUpdated: new Date().toISOString()
-			};
-		} catch (error) {
-      		console.error("Error getting Ethereum wallet info:", error);
-			return {
-				success: false,
-				error: "Failed to get wallet info",
-				details: error.message
-			};
+				if (!this.isValidEthereumAddress(address)) {
+					return res.status(400).json({
+						success: false, 
+						method: "getETHWalletInfo", 
+						error: "Invalid Ethereum address."
+					})
+				}
+
+				// Get current network
+				const network = this.currentNetwork;
+				const etherscanApi = this.networks[network].etherscanApi;
+
+				// Get balance with retry logic
+				let balanceInfo;
+				try {
+					balanceInfo = await this.getWalletBalance(address);
+				} catch (error) {
+					console.error("Error getting balance:", error);
+					balanceInfo = { balanceWei: "0", balanceEth: "0" };
+				}
+
+				// Get transaction count (nonce) with retry
+				let transactionCount = 0;
+				try {
+					transactionCount = await this.provider.getTransactionCount(address);
+				} catch (error) {
+					console.error("Error getting transaction count:", error);
+				}
+
+				// Get transactions from Etherscan API
+				let transactions = [];
+				try {
+					if (this.etherscanApiKey) {
+						const transactionsResponse = await axios.get(etherscanApi, {
+							params: {
+								module: 'account',
+								action: 'txlist',
+								address: address,
+								startblock: 0,
+								endblock: 99999999,
+								page: 1,
+								offset: 10, // Get last 10 transactions
+								sort: 'desc',
+								apikey: this.etherscanApiKey
+							},
+							timeout: 5000 // 5 second timeout
+						});
+
+						// Format transactions
+						if (transactionsResponse.data && transactionsResponse.data.status === '1') {
+							transactions = transactionsResponse.data.result.map(tx => ({
+								hash: tx.hash,
+								from: tx.from,
+								to: tx.to,
+								value: ethers.formatEther(tx.value),
+								gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'),
+								gasUsed: tx.gasUsed,
+								blockNumber: tx.blockNumber,
+								timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
+								isError: tx.isError === '1',
+								confirmations: tx.confirmations
+							}));
+						}
+					} else {
+					console.warn("Etherscan API key not provided. Transaction history unavailable.");
+					}
+				} catch (error) {
+					console.error("Error fetching transaction history:", error);
+				}
+
+				res.status(200).json({
+					success: true, 
+					method: "getETHWalletInfo", 
+					data: {
+						address, 
+						network, 
+						balance: {
+							wei: balanceInfo.balanceWei, 
+							ether: balanceInfo.balanceEth
+						},
+						transactionCount, 
+						transactions, 
+						lastUpdated: new Date().toISOString() 
+					}
+				});
+			} catch (error) {
+				console.error("Error getting Ethereum wallet info:", error);
+				return {
+					success: false, 
+					method: "getETHWalletInfo", 
+					error: "Failed to get Ethereum wallet info", 
+					details: error.message
+				};
+			}
 		}
   	}
 

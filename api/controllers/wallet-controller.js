@@ -178,6 +178,41 @@ class WalletsController {
         }
     }
 
+    /**
+   		* Validate Ethereum address
+		* @param {Object} req - Express request object
+		* @param {Object} res - Express response object
+	*/
+  	validateETHAddress = (req, res) => {
+    	try {
+      		const { address } = req.params;
+      
+			if (!address) {
+				return res.status(400).json({
+				success: false,
+				error: "Address is required"
+				});
+			}
+			
+			const isValid = EthereumWalletService.isValidEthereumAddress(address);
+			
+			res.status(200).json({
+				success: true,
+				method: "validateAddress",
+				data: {
+					address, 
+					isValid
+				}
+			});
+		} catch (error) {
+			console.error("Address validation error:", error);
+			res.status(422).json({
+				success: false,
+				error: error.message || "An error occurred while validating the address"
+			});
+		}
+	}
+
     // update
     update = () => {
         return async (req, res, next) => {
