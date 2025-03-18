@@ -14,8 +14,8 @@ class UsersController {
             if (!emailRegex.test(req.body.email)) {
                 return res.status(422).json({
                     success: false, 
-                    method: "registerUser",
-                    path: "email",
+                    method: "registerUser", 
+                    path: "email", 
                     message: "Please enter a valid email address."
                 });
             }
@@ -25,8 +25,8 @@ class UsersController {
             if (!passwordRegex.test(req.body.password)) {
                 return res.status(422).json({
                     success: false, 
-                    method: "registerUser",
-                    path: "password",
+                    method: "registerUser", 
+                    path: "password", 
                     message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
                 });
             }
@@ -35,11 +35,11 @@ class UsersController {
             if (req.body.password !== req.body.confirm_password) {
                 return res.status(422).json([
                     {
-                        path: "password",
+                        path: "password", 
                         message: "Passwords do not match."
                     },
                     {
-                        path: "confirm_password",
+                        path: "confirm_password", 
                         message: "Passwords do not match."
                     }
                 ])
@@ -49,8 +49,8 @@ class UsersController {
             if (isNaN(req.body.pin) || req.body.pin.toString().length !== 4) {
                 return res.status(422).json({
                     success: false, 
-                    method: "registerUser",
-                    path: "pin",
+                    method: "registerUser", 
+                    path: "pin", 
                     message: "PIN must be a 4-digit number."
                 });
             }
@@ -68,12 +68,19 @@ class UsersController {
                     user_invitationcode: req.body.invitationcode || null // if invitation code is not provided, set to null
                 })
                 res.status(200).json({
-                    success: true,
-                    method: "registerUser", 
-                    user: user
+                    success: true, 
+                    method: "registerUser",  
+                    data: {
+                        user: user
+                    }
                 })
             } catch(err) {
-                res.status(422).json(err.errors)
+                res.status(422).json({
+                    success: false, 
+                    method: "registerUser", 
+                    error: "An error occured while registering user.", 
+                    details: err.errors
+                })
             }
         }
     }
@@ -84,11 +91,11 @@ class UsersController {
                 const msg = "Something is wrong with your email or password";
                 const errors = [
                     {
-                        path: "password",
-                        message: msg,
+                        path: "password", 
+                        message: msg, 
                     }, 
                     {
-                        path: "email",
+                        path: "email", 
                         message: msg
                     }
                 ]
@@ -105,7 +112,7 @@ class UsersController {
                         const signVals = user.toJSON(); //
                         delete signVals.password // remove password from the signvals
                         const token = await jwt.sign(signVals, process.env.JWT_KEY, {
-                            expiresIn: "30d"
+                            expiresIn: "7d"
                         });
                         resp.success = true;
                         resp.method = "login";
@@ -168,8 +175,6 @@ class UsersController {
             }
         }
     }
-
-
 
     update = () => {
         return async (req, res, next) => {
