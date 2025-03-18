@@ -236,7 +236,7 @@ class BitcoinWalletService {
 
                 if (!walletAddress) {
                     return res.status(400).json({
-                        success: false,
+                        success: false, 
                         error: "Wallet address is required"
                     });
                 }
@@ -247,7 +247,7 @@ class BitcoinWalletService {
                     new bitcore.Address(walletAddress);
                 } catch (error) {
                     return res.status(400).json({
-                        success: false,
+                        success: false, 
                         error: "Invalid Bitcoin address format"
                     });
                 }

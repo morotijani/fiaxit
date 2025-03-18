@@ -19,9 +19,10 @@ class WalletsController {
                 });
                 
                 res.status(200).json({
-                    success: true,
-                    method: "getAllWallet",
-                    data: rows,
+                    success: true, 
+                    method: "getAllWallet", 
+                    message: "All wallet displayed.", 
+                    data: rows, 
                     total: count
                 })
             } catch(err) {
@@ -43,20 +44,20 @@ class WalletsController {
 
             const wallet = await Wallet.findOne({
                 where: {
-                    wallet_id: walletId, 
+                    wallet_id: walletId,  
                     wallet_for: userId
                 }
             })
             const resp = {
-                success: false,
+                success: false, 
                 method: "findById", 
-                msg: "Wallet not found!", 
+                message: "Wallet not found!", 
                 wallet: null
             }
             if (wallet) {
                 resp.success = true;
                 resp.method = "findById";
-                resp.msg = "Wallet found!";
+                resp.message = "Wallet found!";
                 resp.wallet = wallet;
             }
             res.status(200).json(resp)
@@ -112,12 +113,11 @@ class WalletsController {
                         walletMnemonic = wallet.mnemonic
                         
                         console.log("USDT Wallet generated:", wallet);
-                        return;
                     } catch (error) {
                         console.error("USDT Wallet generation error:", error);
                         res.status(500).json({
-                            success: false,
-                            error: "Failed to generate USDT wallet",
+                            success: false, 
+                            error: "Failed to generate USDT wallet", 
                             details: error.message
                         });
                     }
@@ -172,13 +172,15 @@ class WalletsController {
                 res.status(201).json({
                     success: true,
                     method: "createAndGenerate"+crypto+"Wallet",
+                    message: `${crypto} Wallet address successfully generated.`, 
                     wallet: wallet
                 });
             } catch(err) {
                 console.error(crypto + " wallet address creation error:", err);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during wallet address creation"
+                    error: "There was an error generating " + crypto + " wallet", 
+                    details: err.message || "An error occurred during wallet address creation"
                 });
             }
         }
@@ -195,8 +197,9 @@ class WalletsController {
       
 			if (!address) {
 				return res.status(400).json({
-				success: false,
-				error: "Address is required"
+                    success: false, 
+                    method: "validateETHAddress", 
+                    error: "Ethereum wallet address is required."
 				});
 			}
 			
@@ -204,7 +207,8 @@ class WalletsController {
 			
 			res.status(200).json({
 				success: true,
-				method: "validateAddress",
+				method: "validateETHAddress", 
+                message: "Ethereum wallet address validated.", 
 				data: {
 					address, 
 					isValid
@@ -214,7 +218,8 @@ class WalletsController {
 			console.error("Address validation error:", error);
 			res.status(422).json({
 				success: false,
-				error: error.message || "An error occurred while validating the address"
+				error: "There was a problem validating Ethereum wallet address.", 
+                details: error.message || "An error occurred while validating the Ethereum wallet address",
 			});
 		}
 	}
@@ -242,7 +247,7 @@ class WalletsController {
                     await dbTransaction.rollback();
                     return res.status(404).json({
                         success: false,
-                        method: "update",
+                        method: "updateTransaction",
                         message: "Transaction not found or you don't have permission to update it."
                     });
                 }
@@ -252,7 +257,7 @@ class WalletsController {
                     await dbTransaction.rollback();
                     return res.status(400).json({
                         success: false,
-                        method: "update",
+                        method: "updateTransaction",
                         message: "Cannot update a processed transaction."
                     });
                 }
@@ -294,7 +299,9 @@ class WalletsController {
                     success: true,
                     method: "update", 
                     message: "Transaction updated successfully.", 
-                    transaction: transaction
+                    data: {
+                        transaction: transaction
+                    }
                 });
             } catch(err) {
                 // Rollback on error
@@ -302,7 +309,8 @@ class WalletsController {
                 console.error("Transaction update error:", err);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during transaction update"
+                    error: "There was a problem updating transaction.", 
+                    details: err.message || "An error occurred during transaction update."
                 });
             }
         }
@@ -322,9 +330,11 @@ class WalletsController {
                 });
                 const resp = {
                     success: false, 
-                    method: "delete", 
-                    msg: "Transaction not found.", 
-                    transaction: null
+                    method: "deleteTransaction", 
+                    message: "Transaction not found.", 
+                    data: {
+                        transaction: null
+                    }
                 }
                 if (transaction) {
                     await transaction.destroy();
@@ -337,7 +347,8 @@ class WalletsController {
                 console.error("Transaction deletion error:", err);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during transaction deletion"
+                    error: "Something went wrong, please try again.", 
+                    details: err.message || "An error occurred during transaction deletion."
                 });
             }
         }
