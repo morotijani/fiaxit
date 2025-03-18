@@ -18,12 +18,17 @@ class TransactionsController {
                 });
                 res.status(200).json({
                     success: true,
-                    method: "getAll",
+                    method: "getAllTransactions",
                     data: rows,
                     total: count
                 })
             } catch(err) {
-                res.status(422).json(err.error)
+                res.status(422).json({
+                    success: false, 
+                    method: "getAllTransactions", 
+                    message: "An error occurred, please try again.", 
+                    details: err.error
+                })
             }
         }
     }
