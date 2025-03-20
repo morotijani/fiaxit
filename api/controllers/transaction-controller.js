@@ -5,7 +5,7 @@ const EthereumWalletService = require('../service/ethereum-wallet-service')
 
 class TransactionsController {
 
-    // get all method
+    // get all transactions
     getAll = () => {
         return async (req, res, next) => {
             try {
@@ -49,13 +49,17 @@ class TransactionsController {
                 success: false,
                 method: "findById", 
                 msg: "Transaction not found!", 
-                transaction: null
+                data: {
+                    transaction: null
+                }
             }
             if (transaction) {
                 resp.success = true;
                 resp.method = "findById";
                 resp.msg = "Transaction found!";
-                resp.transaction = transaction;
+                resp.data = {
+                    transaction: transaction
+                }
             }
             res.status(200).json(resp)
         }
