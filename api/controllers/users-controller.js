@@ -1,4 +1,5 @@
 const User = require('../models/user-model');
+const UserForgetPassword = require('../models/user-forget-password-model')
 const { v4: uuidv4 } = require('uuid')
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken')
@@ -115,7 +116,7 @@ class UsersController {
                         message: msg
                     }
                 ]
-                const resp = {success: false, method: "login", errors: errors}
+                const resp = { success: false, method: "login", errors: errors }
                 const user = await User.findOne({
                     where: {
                         user_email: req.body.email
@@ -317,17 +318,30 @@ class UsersController {
             }
 
             const code = this.generateVerificationCode();
+            try {
+                // inset into forget password table
+                const insert = await UserForgetPassword.create({
+                    password_reset_id: 'id', 
+                    password_reset_user_id: user.user_id, 
+                    password_reset_token: code
+                });
 
-            // inset into forget password table
-            res.status(200).json({
-                success: true, 
-                method: "userForgtPassword", 
-                message: "Forget password verification code sent to your email.", 
-                data: {
-                    code: code
-                }
-            })
-
+                res.status(201).json({
+                    success: true, 
+                    method: "userForgtPassword", 
+                    message: "Forget password verification code sent to your email.", 
+                    data: {
+                        insert
+                    }
+                })
+            } catch(error) {
+                res.status(400).json({
+                    success: false, 
+                    method: "userForgetPassword", 
+                    message: "Forget password failed: Error while creating forget password code.", 
+                    error: error.message
+                })
+            }
         }
     }
 

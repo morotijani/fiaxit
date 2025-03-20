@@ -44,9 +44,6 @@ const userAuth = require("../middleware/check-auth");
 */
 router.patch('/update/:id', userAuth.authenticate, UserController.update()); // update user
 
-// Usage (example): GET /api/v1/loggedInUser
-//router.get('/loggedInUser', userAuth.authenticate, UserController.loggedInUser()); // logged in user
-
 // Usage (example): GET /api/v1/logout
 //router.get('/logout', userAuth.authenticate, UserController.logout()); // Logout route - authenticate middleware adds token to req.token
 

@@ -28,6 +28,9 @@ router.post('/signup', AuthController.signup()); // Register users
 */
 router.post('/login', AuthController.login()); // login user
 
+// Usage (example): GET /api/v1/loggedInUser
+router.get('/loggedInUser', userAuth.authenticate, AuthController.loggedInUser()); // logged in user
+
 // Usage (example): GET /api/v1/logout
 router.get('/logout', userAuth.authenticate, AuthController.logout()); // Logout route - authenticate middleware adds token to req.token
 
