@@ -16,8 +16,24 @@ class UsersController {
                     success: false, 
                     method: "registerUser", 
                     path: "email", 
-                    message: "Please enter a valid email address."
+                    message: "Registration failed: Please enter a valid email address."
                 });
+            }
+
+            // check if email already exist
+            const isEmailExist = await User.findOne({
+                where: {
+                    user_email: req.body.email
+                }
+            })
+
+            if (isEmailExist) {
+                return res.status(401).json({
+                    success: false, 
+                    method: "registerUser", 
+                    path: "email", 
+                    message: "Registration failed: Email already exist."
+                })
             }
 
             // check for password length and characters
@@ -27,7 +43,7 @@ class UsersController {
                     success: false, 
                     method: "registerUser", 
                     path: "password", 
-                    message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                    message: "Registration failed: Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
                 });
             }
 
@@ -36,11 +52,11 @@ class UsersController {
                 return res.status(422).json([
                     {
                         path: "password", 
-                        message: "Passwords do not match."
+                        message: "Registration failed: Passwords do not match."
                     },
                     {
                         path: "confirm_password", 
-                        message: "Passwords do not match."
+                        message: "Registration failed: Passwords do not match."
                     }
                 ])
             }
@@ -78,7 +94,7 @@ class UsersController {
                 res.status(422).json({
                     success: false, 
                     method: "registerUser", 
-                    message: "An error occured while registering user.", 
+                    message: "Registration failed: An error occured while registering user.", 
                     details: error.message
                 })
             }
@@ -301,6 +317,8 @@ class UsersController {
             }
 
             const code = this.generateVerificationCode();
+
+            // inset into forget password table
             res.status(200).json({
                 success: true, 
                 method: "userForgtPassword", 
