@@ -29,7 +29,7 @@ class BitcoinWalletService {
 	*/
 	generateWallet() {
 		try {
-			const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
+			const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
 
 			// Set network based on isTestnet
 			this.network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
@@ -232,7 +232,7 @@ class BitcoinWalletService {
         return async (req, res, next) => {
             try {
                 const walletAddress = req.params.address;
-				const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
+				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
 
                 if (!walletAddress) {
                     return res.status(400).json({
@@ -321,7 +321,7 @@ class BitcoinWalletService {
 		return async (req, res, next) => {
 			try {
 				const address = req.params.address;
-				const isTestnet= (process.env.NODE_ENV === 'production' ? false : true);
+				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
 				if (!address) {
 					return res.status(400).json({
 						success: false, 

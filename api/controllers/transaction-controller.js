@@ -65,22 +65,24 @@ class TransactionsController {
         }
     }
 
-    // create
+    // create and make a trade
     create = () => {
         return async (req, res, next) => {
             try {
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-
+                const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
+                
                 // validate required fields
                 const requiredFields = ['amount', 'crypto_id', 'receiverAddress', 'senderPrivateKey'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
                             success: false, 
+                            method: "createAndSend" + cryptoSymbol, 
                             error: `Missing required field: ${field}`
                         });
                     }
                 }
+
                 let result;
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
@@ -89,7 +91,7 @@ class TransactionsController {
                 const amount = req.body.amount;
                 const senderPrivateKey = req.body.senderPrivateKey
                 const receiverWalletAddress = req.body.receiverAddress 
-                const feeRate = req.body.feeRate || 10 //0.0001
+                const feeRate = req.body.feeRate || 10 // 0.0001 (if rate fee is not set)
 
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
@@ -102,13 +104,12 @@ class TransactionsController {
                     
                     if (result.txid) {
                         console.log('Bitcoin Transaction sent successfully:', result.txid);
-                        console.log('result:', result);
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
                         res.status(422).json({
                             success: false, 
                             method: "createAndSend" + cryptoSymbol,
-                            message: "Transaction failed", 
+                            message: "Bitcoin Transaction failed", 
                             result: result.error,
                             details: result.details
                         });
@@ -116,7 +117,6 @@ class TransactionsController {
                 } else if (cryptoSymbol === 'USDT') {
 
                 } else if (cryptoSymbol === 'ETH') {
-                    result = await EthereumWalletService.sendEther(senderPrivateKey, receiverWalletAddress, amount)
                     const speedTransaction = null;
                     if (speedTransaction) {
                         const higherFee = 1.5 // 50% higher fee
@@ -131,6 +131,9 @@ class TransactionsController {
                             amount, 
                             higherFee
                         );
+                    } else { 
+                        // use normal legacy transaction speed
+                        result = await EthereumWalletService.sendEther(senderPrivateKey, receiverWalletAddress, amount)
                     }
                     
                     if (result.txid) {
@@ -141,7 +144,7 @@ class TransactionsController {
                         res.status(422).json({
                             success: false, 
                             method: "createAndSend" + cryptoSymbol,
-                            message: "Transaction failed", 
+                            message: "Ethereum Transaction failed", 
                             result: result.error,
                             details: result.details
                         });
@@ -168,14 +171,17 @@ class TransactionsController {
                         success: true,
                         method: "createAndSend" + cryptoSymbol, 
                         transaction: transaction, 
-                        crypto_result: result
+                        data: {
+                            transaction: result
+                        }
                     });
                 }
-            } catch(err) {
-                console.error("Transaction creation error:", err);
+            } catch(error) {
+                console.error("Transaction creation error:", error);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during transaction creation"
+                    error: "An error occurred during transaction creation", 
+                    details: error.message
                 });
             }
         }
