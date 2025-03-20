@@ -187,7 +187,7 @@ class TransactionsController {
         }
     }
 
-    // update
+    // update transaction
     update = () => {
         return async (req, res, next) => {
             // Start a database transaction for data integrity
@@ -209,8 +209,8 @@ class TransactionsController {
                 if (!transaction) {
                     await dbTransaction.rollback();
                     return res.status(404).json({
-                        success: false,
-                        method: "update",
+                        success: false, 
+                        method: "updateTransaction", 
                         message: "Transaction not found or you don't have permission to update it."
                     });
                 }
@@ -219,8 +219,8 @@ class TransactionsController {
                 if (transaction.transaction_status > 1) {
                     await dbTransaction.rollback();
                     return res.status(400).json({
-                        success: false,
-                        method: "update",
+                        success: false, 
+                        method: "updateTransaction", 
                         message: "Cannot update a processed transaction."
                     });
                 }
@@ -247,7 +247,7 @@ class TransactionsController {
                     await dbTransaction.rollback();
                     return res.status(400).json({
                         success: false,
-                        method: "update",
+                        method: "updateTransaction", 
                         message: "No valid fields provided for update."
                     });
                 }
@@ -260,24 +260,28 @@ class TransactionsController {
                 
                 res.status(200).json({
                     success: true,
-                    method: "update", 
+                    method: "updateTransaction", 
                     message: "Transaction updated successfully.", 
-                    transaction: transaction
+                    data: {
+                        transaction: transaction
+                    }
                 });
-            } catch(err) {
+            } catch(error) {
                 // Rollback on error
                 await dbTransaction.rollback();
-                console.error("Transaction update error:", err);
+                console.error("Transaction update error:", error);
                 res.status(422).json({
                     success: false,
-                    error: err.message || "An error occurred during transaction update"
+                    method: "updateTransaction", 
+                    error: "An error occurred during transaction update.", 
+                    details: error.message
                 });
             }
         }
     }
 
 
-    // delete
+    // delete transaction
     delete = () => {
         return async (req, res, next) => {
             try {
@@ -291,22 +295,25 @@ class TransactionsController {
                 });
                 const resp = {
                     success: false, 
-                    method: "delete", 
-                    msg: "Transaction not found.", 
-                    transaction: null
+                    method: "deleteTransaction", 
+                    message: "Transaction not found.", 
+                    data: {
+                        transaction: null
+                    }
                 }
                 if (transaction) {
                     await transaction.destroy();
                     resp.success = true;
-                    resp.method = "delete";
-                    resp.msg = "Transaction deleted.";
+                    resp.method = "deleteTransaction";
+                    resp.message = "Transaction deleted successfully.";
                 }
                 res.status(200).json(resp)
             } catch (err) {
                 console.error("Transaction deletion error:", err);
                 res.status(422).json({
-                    success: false,
-                    error: err.message || "An error occurred during transaction deletion"
+                    success: false, 
+                    error: "An error occurred during transaction deletion", 
+                    details: err.message
                 });
             }
         }
