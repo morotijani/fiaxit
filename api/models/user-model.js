@@ -76,6 +76,7 @@ const User = mysql.define('fiaxit_users', {
         {fields: ['createdAt']}
     ], 
     timestamps: true, 
+    paranoid: true, 
     createdAt: 'createdAt', 
     updatedAt: 'updatedAt'
 });

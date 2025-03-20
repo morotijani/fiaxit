@@ -80,6 +80,7 @@ const Transaction = mysql.define('fiaxit_transactions', {
     ],
     timestamps: true, // Enable timestamps
     // underscored: true, // Use snake_case for auto-generated fields
+    paranoid: true, 
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 });

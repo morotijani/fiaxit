@@ -19,7 +19,6 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
     password_reset_id: {
         type: DataTypes.STRING(255), 
         allowNull: false, 
-        unique: true
     }, 
     password_reset_user_id: {
         type: DataTypes.STRING(255), 
@@ -46,6 +45,7 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
 }, {
     indexes: [
         {
+            unique: true, 
             fields: ['password_reset_id']
         }, 
         {
@@ -63,6 +63,9 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
     ], 
     timestamps: true, 
     paranoid: true, 
+    // underscored: true, // Use snake_case for auto-generated fields
+    createdAt: 'createdAt', 
+    updatedAt: 'updatedAt', 
     tableName: 'fiaxit_user_forget_password', 
     charset: 'utf8', 
     collate: 'utf8_general_ci', 

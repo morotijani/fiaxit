@@ -62,6 +62,7 @@ const Wallet = mysql.define('fiaxit_wallets', {
     ],
     timestamps: true, // Enable timestamps
     // underscored: true, // Use snake_case for auto-generated fields
+    paranoid: true, 
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 });
