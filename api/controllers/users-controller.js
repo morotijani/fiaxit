@@ -69,17 +69,17 @@ class UsersController {
                 })
                 res.status(200).json({
                     success: true, 
-                    method: "registerUser",  
+                    method: "registerUser", 
                     data: {
                         user: user
                     }
                 })
-            } catch(err) {
+            } catch(error) {
                 res.status(422).json({
                     success: false, 
                     method: "registerUser", 
-                    error: "An error occured while registering user.", 
-                    details: err.errors
+                    message: "An error occured while registering user.", 
+                    details: error.message
                 })
             }
         }
@@ -122,7 +122,7 @@ class UsersController {
                 } else {
                     res.status(401).json({
                         success: false,
-                        method: "login",
+                        method: "userLogin",
                         message: "User not found."
                     })
                 }
@@ -130,9 +130,9 @@ class UsersController {
             } catch(error) {
                 res.status(500).json({
                     success: false, 
-                    method: "login", 
+                    method: "userLogin", 
                     message: "An error occurred while logging in the user.", 
-                    error: error.message
+                    details: error.message
                 });
             }
         }
@@ -145,7 +145,7 @@ class UsersController {
                 if (!token) {
                     return res.status(401).json({
                         success: false, 
-                        method: "logout", 
+                        method: "userLogout", 
                         message: "Logout failed: No authentication token provided."
                     });
                 }
@@ -154,13 +154,13 @@ class UsersController {
                 if (blacklisted) {
                     res.status(200).json({
                         success: true, 
-                        method: "logout", 
+                        method: "userLogout", 
                         message: "Logout successful: Token blacklisted. User has been logged out."       
                     });
                 } else {
                     res.status(400).json({
                         success: false, 
-                        method: "logout",
+                        method: "userLogout",
                         message: "Logout failed (Could not blacklist token): An error occurred while logging out the user.",
                         error: error.message
                     });
@@ -168,7 +168,7 @@ class UsersController {
             } catch(error) {
                 res.status(500).json({
                     success: false, 
-                    method: "logout",
+                    method: "userLogout",
                     message: "Logout failed: An error occurred while logging out the user.",
                     error: error.message
                 });
@@ -189,7 +189,7 @@ class UsersController {
                     return res.status(401).json({
                         success: false, 
                         method: "updateUser", 
-                        msg: "You do not have permission to update this user."
+                        message: "You do not have permission to update this user."
                     })
                 }
                 const user = await User.findOne({
@@ -217,15 +217,15 @@ class UsersController {
                     await user.reload();
                     resp.success = true;
                     resp.method = "updateUser";
-                    resp.user = user
+                    resp.data = { user: user }
                 }
                 res.status(200).json(resp)
-            } catch (err) {
+            } catch (error) {
                 return res.status(401).json({
                     success: false, 
                     method: 'updateUser', 
-                    msg: "An error occured on updating user", 
-                    details: err.message
+                    message: "An error occured on updating user.", 
+                    details: error.message
                 })
             }
         }
@@ -237,8 +237,8 @@ class UsersController {
                 const resp = {
                     success: false, 
                     method: "loggedInUser", 
-                    user: null, 
-                    msg: "User not found."
+                    data: {user: null}, 
+                    message: "User not found."
                 }
             
                 const user = req.userData
@@ -247,8 +247,8 @@ class UsersController {
 
                 resp.success = true;
                 resp.method =  "loggedInUser";
-                resp.user = data;
-                resp.msg = "User is logged in.";
+                resp.data = {user: data};
+                resp.message = "User is logged in.";
 
                 res.status(200).json(resp);
             } catch(error) {
@@ -256,7 +256,7 @@ class UsersController {
                     success: false, 
                     method: "loggedInUser", 
                     message: "An error occurred while fetching logged in user.", 
-                    error: error.message
+                    details: error.message
                 });
             }
         }
