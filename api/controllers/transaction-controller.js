@@ -308,12 +308,13 @@ class TransactionsController {
                     resp.message = "Transaction deleted successfully.";
                 }
                 res.status(200).json(resp)
-            } catch (err) {
+            } catch (error) {
                 console.error("Transaction deletion error:", err);
                 res.status(422).json({
                     success: false, 
+                    method: "deleteTransaction", 
                     error: "An error occurred during transaction deletion", 
-                    details: err.message
+                    details: error.message
                 });
             }
         }
