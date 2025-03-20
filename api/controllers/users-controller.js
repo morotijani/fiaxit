@@ -262,6 +262,73 @@ class UsersController {
         }
     }
 
+    // Forget password
+    forgetPassword = () => {
+        return async (req, res, next) => {
+            const email = req.body.email
+
+            if (!email) {
+                res.status(401).json({
+                    status: false, 
+                    method: 'userForgetPassword', 
+                    path: "email", 
+                    message: 'Missing required parameters: Email is required.'
+                })
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                res.status(422).json({
+                    success: false, 
+                    method: "userForgetPassword", 
+                    path: "email", 
+                    message: "Forget Password failed: Please enter a valid email address."
+                });
+            }
+
+            const user = await User.findOne({
+                where: {
+                    user_email: email
+                }
+            })
+
+            if (!user) {
+                res.status(401).json({
+                    status: false,
+                    method: "userForgetPassword", 
+                    message: "Forget Password failed: Unknown user.",
+                })
+            }
+
+            const code = this.generateVerificationCode();
+            res.status(200).json({
+                success: true, 
+                method: "userForgtPassword", 
+                message: "Forget password verification code sent to your email.", 
+                data: {
+                    code: code
+                }
+            })
+
+        }
+    }
+
+    verifyVerificationCode = () => {
+        return async (req, res, next) => {
+
+        }
+    } 
+    
+    resetPassword = () => {
+        return async (req, res, next) => {
+
+        }
+    }
+
+    generateVerificationCode = () => {
+        return Math.floor(Math.random() * (999999 - 100001)) + 100001;
+    }
+
 }
 
 module.exports = new UsersController() // instantiate class and add to module so that we can use it anywhere else

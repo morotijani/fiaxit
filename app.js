@@ -3,6 +3,7 @@ const app = express();
 const router = express.Router(); // middleware
 const contactRoutes = require('./api/routes/contacts')
 const todoRoutes = require('./api/routes/todos')
+const authRoutes = require('./api/routes/auth')
 const userRoutes = require('./api/routes/users')
 const transactionRoutes = require('./api/routes/transactions')
 const walletRoutes = require('./api/routes/wallets')
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/v1/contacts', contactRoutes)
 app.use('/v1/todos', todoRoutes)
+app.use('/v1/auth', authRoutes)
 app.use('/v1/users', userRoutes)
 app.use('/v1/wallets', authenticate, walletRoutes)
 app.use('/v1/transactions', authenticate, transactionRoutes)

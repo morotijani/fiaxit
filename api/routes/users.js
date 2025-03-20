@@ -17,7 +17,7 @@ const userAuth = require("../middleware/check-auth");
         "invitationcode": "" // not compulsory
     }
 */
-router.post('/signup', UserController.signup()); // Register users
+//router.post('/signup', UserController.signup()); // Register users
 
 // Usage (example): POST /api/v1/login
 /** body
@@ -26,7 +26,7 @@ router.post('/signup', UserController.signup()); // Register users
         "password": "",
     }
 */
-router.post('/login', UserController.login()); // login user
+//router.post('/login', UserController.login()); // login user
 
 // Usage (example): PATCH /api/v1/update/:id
 /** body
@@ -45,10 +45,10 @@ router.post('/login', UserController.login()); // login user
 router.patch('/update/:id', userAuth.authenticate, UserController.update()); // update user
 
 // Usage (example): GET /api/v1/loggedInUser
-router.get('/loggedInUser', userAuth.authenticate, UserController.loggedInUser()); // logged in user
+//router.get('/loggedInUser', userAuth.authenticate, UserController.loggedInUser()); // logged in user
 
 // Usage (example): GET /api/v1/logout
-router.get('/logout', userAuth.authenticate, UserController.logout()); // Logout route - authenticate middleware adds token to req.token
+//router.get('/logout', userAuth.authenticate, UserController.logout()); // Logout route - authenticate middleware adds token to req.token
 
 // Usage (example): POST /api/v1/forgot-password
 /** body
@@ -57,7 +57,7 @@ router.get('/logout', userAuth.authenticate, UserController.logout()); // Logout
         "pin": "",
     }
 */
-router.post('/forgot-password', UserController.forgetPassword()) // Forget password 
+//router.post('/forgot-password', UserController.forgetPassword()) // Forget password 
 
 // Usage (example): POST /api/v1/reset-verify
 /** body
@@ -65,7 +65,7 @@ router.post('/forgot-password', UserController.forgetPassword()) // Forget passw
         "code": "", 
     }
 */
-router.post('/reset-verify', UserController.verifyVerificationCode()) // reset verify (6 Digit Verification Code) 
+//router.post('/reset-verify', UserController.verifyVerificationCode()) // reset verify (6 Digit Verification Code) 
 
 // Usage (example): POST /api/v1/reset-password
 /** body
@@ -75,6 +75,6 @@ router.post('/reset-verify', UserController.verifyVerificationCode()) // reset v
         "confirm_password": "", 
     }
 */
-router.post('/reset-password', UserController.resetPassword()) // reset password
+//router.post('/reset-password', UserController.resetPassword()) // reset password
 
 module.exports = router;
