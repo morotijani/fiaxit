@@ -25,7 +25,7 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
         allowNull: false, 
     }, 
     password_reset_token: {
-        type: DataTypes.STRING(10), 
+        type: DataTypes.STRING(255), 
         allowNull: false, 
     }, 
     password_reset_expires: {
@@ -38,12 +38,12 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
     }, 
     createdAt: {
         type: DataTypes.DATE, 
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'), 
+        defaultValue: Sequelize.NOW, 
         allowNull: false
     }, 
     updatedAt: {
         type: DataTypes.DATE, 
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'), 
+        defaultValue: Sequelize.NOW
     }
 }, {
     indexes: [

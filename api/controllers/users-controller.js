@@ -558,11 +558,24 @@ class UsersController {
             user.updatePassword = true; // Flag to trigger password hashing in your model hooks
             user.user_password = newPassword;
             await user.save();
+
+            // update user forget password table
+            await UserForgetPassword.update(
+                {
+                    password_reset_is_used: true, 
+                }, 
+                {
+                    where: {
+                        password_reset_id: resetRecord.password_reset_id
+                    }
+                }
+            )
             
             // Clear the reset record
             await UserForgetPassword.destroy({
                 where: {
-                    password_reset_id: resetRecord.password_reset_id
+                    password_reset_id: resetRecord.password_reset_id, 
+                    password_reset_user_id: resetRecord.password_reset_user_id, 
                 }
             });
             
