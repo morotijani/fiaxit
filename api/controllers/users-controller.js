@@ -165,7 +165,7 @@ class UsersController {
                         resp.token = token
                     }
                 } else {
-                    res.status(401).json({
+                    return res.status(401).json({
                         success: false,
                         method: "userLogin",
                         message: "User not found."
@@ -173,7 +173,7 @@ class UsersController {
                 }
                 res.status(200).json(resp)
             } catch(error) {
-                res.status(500).json({
+                return res.status(500).json({
                     success: false, 
                     method: "userLogin", 
                     message: "An error occurred while logging in the user.", 
