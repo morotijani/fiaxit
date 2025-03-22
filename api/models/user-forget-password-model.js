@@ -28,6 +28,9 @@ const UserForgetPassword = mysql.define('fiaxit_user_forget_password', {
         type: DataTypes.STRING(10), 
         allowNull: false, 
     }, 
+    password_reset_expires: {
+        type: DataTypes.DATE
+    }, 
     password_reset_is_used: {
         type: DataTypes.BOOLEAN, 
         allowNull: false, 
