@@ -4,8 +4,65 @@ const { v4: uuidv4 } = require('uuid')
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken')
 const { blacklistToken } = require('../middleware/check-auth');
+const nodemailer = require('nodemailer')
+const crypto = require('crypto')
+
+// Configure email transporter
+// const transporter = nodemailer.createTransport({
+//     // service: 'gmail', // or another email service
+//     host: process.env.EMAIL_HOST, 
+//     port: process.env.EMAIL_PORT, 
+//     secure: true, // true for port 465, false for other ports
+//     ignoreTLS: true, // add this 
+//     logger: true, 
+//     auth: {
+//         user: process.env.EMAIL_USERNAME, 
+//         pass: process.env.EMAIL_PASSWORD
+//     }
+// });
+
+// const transporter = nodemailer.createTransport({
+//     service: 'gmail', // or use host/port configuration for other services
+//     host: 'smtp.gmail.com',
+//     port: 587,
+//     secure: false,
+//     auth: {
+//         user: process.env.GMAIL_APP_USER, 
+//         pass: process.env.GMAIL_APP_PASS
+//     },
+//     tls: {
+//         rejectUnauthorized: false
+//     }      
+// });
+
+const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // use TLS
+    auth: {
+        user: process.env.EMAIL_USERNAME,
+        pass: process.env.EMAIL_PASSWORD
+    },
+    tls: {
+        // do not fail on invalid certs
+        rejectUnauthorized: false
+    }
+});
+
+// Verify SMTP connection
+transporter.verify((error, success) => {
+    if (error) {
+        console.log('SMTP server connection error:', error);
+    } else {
+        console.log('SMTP server connection successful');
+    }
+});
+
+// Store verification codes temporarily (in production, use Redis or similar)
+const verificationCodes = new Map();
 
 class UsersController {
+    
     signup = () => {
         return async (req, res, next) => {
             const userId = uuidv4();
@@ -282,46 +339,62 @@ class UsersController {
     // Forget password
     forgetPassword = () => {
         return async (req, res, next) => {
-            const email = req.body.email
-
-            if (!email) {
-                res.status(401).json({
-                    status: false, 
-                    method: 'userForgetPassword', 
-                    path: "email", 
-                    message: 'Missing required parameters: Email is required.'
-                })
-            }
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                res.status(422).json({
-                    success: false, 
-                    method: "userForgetPassword", 
-                    path: "email", 
-                    message: "Forget Password failed: Please enter a valid email address."
-                });
-            }
-
-            const user = await User.findOne({
-                where: {
-                    user_email: email
-                }
-            })
-
-            if (!user) {
-                res.status(401).json({
-                    status: false,
-                    method: "userForgetPassword", 
-                    message: "Forget Password failed: Unknown user.",
-                })
-            }
-
-            const code = this.generateVerificationCode();
             try {
+                const { email } = req.body
+
+                if (!email) {
+                    res.status(401).json({
+                        status: false, 
+                        method: 'userForgetPassword', 
+                        path: "email", 
+                        message: 'Missing required parameters: Email is required.'
+                    })
+                }
+
+                const user = await User.findOne({ email 
+                    // where: {
+                    //     user_email: email
+                    // }
+                })
+
+                if (!user) {
+                    res.status(404).json({
+                        status: false,
+                        method: "userForgetPassword", 
+                        message: "Forget Password failed: User not found.",
+                    })
+                }
+
+                // const code = this.generateVerificationCode();
+                // Generate a random 6-digit verification code
+                const verificationCode = crypto.randomInt(100000, 999999).toString();
+
+                // Store the verification code in the map with the user's email as the key
+                verificationCodes.set(email, {
+                    code: verificationCode, 
+                    expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes from now
+                })
+
+                // Send verification code via email
+                const mailOptions = {
+                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME, 
+                    to: email, 
+                    subject: 'Password Reset Verification Code.', 
+                    html:  `
+                        <h1>Password Reset Request</h1>
+                        <p>You requested a password reset. Please use the following verification code to reset your password:</p>
+                        <h2 style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 24px;">${verificationCode}</h2>
+                        <p>This code will expire in 15 minutes.</p>
+                        <p>If you didn't request a password reset, please ignore this email.</p>
+                    `
+                }
+
+                // Send the email
+                await transporter.sendMail(mailOptions);
+
                 // inset into forget password table
                 const insert = await UserForgetPassword.create({
-                    password_reset_id: 'id', 
+                    password_reset_id: '', 
                     password_reset_user_id: user.user_id, 
                     password_reset_token: code
                 });
@@ -335,11 +408,12 @@ class UsersController {
                     }
                 })
             } catch(error) {
-                res.status(400).json({
+                console.error('Error in forget password:', error)
+                res.status(500).json({
                     success: false, 
                     method: "userForgetPassword", 
                     message: "Forget password failed: Error while creating forget password code.", 
-                    error: error.message
+                    details: error.message
                 })
             }
         }
