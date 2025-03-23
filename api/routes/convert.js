@@ -3,7 +3,7 @@ const router = express.Router();
 const ConvertController = require('../controllers/converter-controller');
 
 // Convert crypto currency to fiat (GET method)
-router.get('/:cryptoCurrency/:fiatCurrency/:amount', ConvertController.convertCurrency());
+router.get('/:fromCurrency/:toCurrency/:amount/:direction', ConvertController.convertCurrency());
 
 // Convert crypto currency to fiat (POST method)
 router.post('/convert', ConvertController.convertCurrency());

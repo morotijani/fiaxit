@@ -5,14 +5,14 @@ class ConvertController {
     convertCurrency = () => {
         return async (req, res, next) => {
             try {
-                const { cryptoCurrency, fiatCurrency, amount } = req.params;
+                const { fromCurrency, toCurrency, amount, direction = 'crypto-to-fiat' } = req.params;
                 
                 // Validate input parameters
-                if (!cryptoCurrency || !fiatCurrency || !amount) {
+                if (!fromCurrency || !toCurrency || !amount) {
                     return res.status(400).json({
                         success: false, 
                         method: "convertCurrency", 
-                        message: "Missing required parameters: cryptoCurrency, fiatCurrency, and amount are required."
+                        message: "Missing required parameters: fromCurrency, toCurrency, and amount are required."
                     });
                 }
                 
@@ -25,10 +25,20 @@ class ConvertController {
                     });
                 }
                 
-                // Convert cryptocurrency ID to lowercase for API compatibility
-                const cryptoId = cryptoCurrency.toLowerCase();
-                // Convert fiat currency to lowercase for API compatibility
-                const fiatId = fiatCurrency.toLowerCase();
+                // Determine which is crypto and which is fiat based on direction
+                let cryptoId, fiatId;
+                let fromIsCrypto = true;
+                
+                if (direction === 'fiat-to-crypto') {
+                    cryptoId = toCurrency.toLowerCase();
+                    fiatId = fromCurrency.toLowerCase();
+                    fromIsCrypto = false;
+                } else {
+                    // Default: crypto-to-fiat
+                    cryptoId = fromCurrency.toLowerCase();
+                    fiatId = toCurrency.toLowerCase();
+                    fromIsCrypto = true;
+                }
                 
                 // Fetch current exchange rate from CoinGecko API
                 const response = await axios.get(
@@ -40,7 +50,7 @@ class ConvertController {
                     return res.status(404).json({
                         success: false, 
                         method: "convertCurrency", 
-                        message: `Cryptocurrency '${cryptoCurrency}' not found.`
+                        message: `Cryptocurrency '${fromIsCrypto ? fromCurrency : toCurrency}' not found.`
                     });
                 }
                 
@@ -49,15 +59,22 @@ class ConvertController {
                     return res.status(404).json({
                         success: false, 
                         method: "convertCurrency", 
-                        message: `Fiat currency '${fiatCurrency}' not found.`
+                        message: `Currency '${fromIsCrypto ? toCurrency : fromCurrency}' not found.`
                     });
                 }
                 
                 // Get the exchange rate
                 const exchangeRate = response.data[cryptoId][fiatId];
                 
-                // Calculate the converted amount
-                const convertedAmount = parseFloat(amount) * exchangeRate;
+                // Calculate the converted amount based on direction
+                let convertedAmount;
+                if (fromIsCrypto) {
+                    // Crypto to fiat: multiply by exchange rate
+                    convertedAmount = parseFloat(amount) * exchangeRate;
+                } else {
+                    // Fiat to crypto: divide by exchange rate
+                    convertedAmount = parseFloat(amount) / exchangeRate;
+                }
                 
                 // Return the result
                 return res.status(200).json({
@@ -65,14 +82,15 @@ class ConvertController {
                     method: "convertCurrency", 
                     data: { 
                         from: { 
-                            currency: cryptoCurrency, 
+                            currency: fromCurrency, 
                             amount: parseFloat(amount) 
                         }, 
                         to: { 
-                            currency: fiatCurrency, 
+                            currency: toCurrency, 
                             amount: convertedAmount 
                         }, 
-                        exchangeRate: exchangeRate, 
+                        exchangeRate: exchangeRate,
+                        conversionDirection: direction,
                         timestamp: new Date()
                     }
                 });
@@ -88,6 +106,7 @@ class ConvertController {
             }
         }
     }
+
     
     // Get supported cryptocurrencies
     getSupportedCryptos = () => {
