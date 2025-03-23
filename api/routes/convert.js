@@ -14,10 +14,10 @@ router.get('/supported/cryptocurrencies', ConvertController.getSupportedCryptos(
 // Get supported fiat currencies
 router.get('/supported/fiat', ConvertController.getSupportedFiat());
 
-// Get historical exchange rates
-router.get('/historical/:cryptoCurrency/:fiatCurrency/:days', ConvertController.getHistoricalRates());
+// Get historical exchange rates /:cryptoCurrency/:fiatCurrency/:days
+router.get('/historical', ConvertController.getHistoricalRates());
 
-// Get current rate
-router.get('/current/:cryptoCurrency/:fiatCurrency', ConvertController.getCurrentRate());
+// Get current rate /:cryptoCurrency/:fiatCurrency
+router.get('/current', ConvertController.getCurrentRate());
 
 module.exports = router;
