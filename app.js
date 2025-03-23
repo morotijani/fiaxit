@@ -8,6 +8,7 @@ const userRoutes = require('./api/routes/users')
 const transactionRoutes = require('./api/routes/transactions')
 const walletRoutes = require('./api/routes/wallets')
 const tradeRoutes = require('./api/routes/trade')
+const coverterRoutes = require('./api/routes/convert')
 const morgan = require('morgan') // HTTP request logger middleware for node.js
 const bodyParser = require('body-parser')
 const { authenticate } = require('./api/middleware/check-auth');
@@ -37,6 +38,7 @@ app.use('/v1/users', userRoutes)
 app.use('/v1/wallets', authenticate, walletRoutes)
 app.use('/v1/transactions', authenticate, transactionRoutes)
 app.use('/v1/trade', authenticate, tradeRoutes)
+app.use('/v1/converter', coverterRoutes)
 
 // Error handling
 app.use((req, res, next) => {
