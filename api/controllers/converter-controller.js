@@ -11,7 +11,7 @@ class ConvertController {
                 if (!cryptoCurrency || !fiatCurrency || !amount) {
                     return res.status(400).json({
                         success: false, 
-                        method: "convert", 
+                        method: "convertCurrency", 
                         message: "Missing required parameters: cryptoCurrency, fiatCurrency, and amount are required."
                     });
                 }
@@ -20,7 +20,7 @@ class ConvertController {
                 if (isNaN(amount) || parseFloat(amount) <= 0) {
                     return res.status(400).json({
                         success: false, 
-                        method: "convert", 
+                        method: "convertCurrency", 
                         message: "Amount must be a positive number."
                     });
                 }
@@ -39,7 +39,7 @@ class ConvertController {
                 if (!response.data[cryptoId]) {
                     return res.status(404).json({
                         success: false, 
-                        method: "convert", 
+                        method: "convertCurrency", 
                         message: `Cryptocurrency '${cryptoCurrency}' not found.`
                     });
                 }
@@ -48,7 +48,7 @@ class ConvertController {
                 if (!response.data[cryptoId][fiatId]) {
                     return res.status(404).json({
                         success: false, 
-                        method: "convert", 
+                        method: "convertCurrency", 
                         message: `Fiat currency '${fiatCurrency}' not found.`
                     });
                 }
@@ -62,7 +62,7 @@ class ConvertController {
                 // Return the result
                 return res.status(200).json({
                     success: true, 
-                    method: "convert", 
+                    method: "convertCurrency", 
                     data: { 
                         from: { 
                             currency: cryptoCurrency, 
@@ -81,7 +81,7 @@ class ConvertController {
                 console.error('Error in currency conversion:', error);
                 return res.status(500).json({
                     success: false,
-                    method: "convert",
+                    method: "convertCurrency",
                     message: "An error occurred during currency conversion.",
                     details: error.message
                 });
@@ -251,7 +251,105 @@ class ConvertController {
         }
     }
 
-
+    // Get current exchange rate between a cryptocurrency and a fiat currency
+    getCurrentRate = () => {
+        return async (req, res, next) => {
+            try {
+                // Extract query parameters
+                const { cryptoId, vsCurrency } = req.query;
+                
+                // Validate required parameters
+                if (!cryptoId || !vsCurrency) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "getCurrentRate",
+                        message: "Missing required parameters: cryptoId and vsCurrency are required."
+                    });
+                }
+                
+                // Convert parameters to lowercase for API compatibility
+                const crypto = cryptoId.toLowerCase();
+                const currency = vsCurrency.toLowerCase();
+                
+                // Fetch current exchange rate from CoinGecko API
+                const response = await axios.get(
+                    `https://api.coingecko.com/api/v3/simple/price`,
+                    {
+                        params: {
+                            ids: crypto,
+                            vs_currencies: currency,
+                            include_market_cap: true,
+                            include_24hr_vol: true,
+                            include_24hr_change: true,
+                            include_last_updated_at: true
+                        }
+                    }
+                );
+                
+                // Check if the requested cryptocurrency exists in the response
+                if (!response.data[crypto]) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "getCurrentRate",
+                        message: `Cryptocurrency '${cryptoId}' not found.`
+                    });
+                }
+                
+                // Check if the requested currency exists in the response
+                if (!response.data[crypto][currency]) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "getCurrentRate",
+                        message: `Currency '${vsCurrency}' not found.`
+                    });
+                }
+                
+                // Extract data from response
+                const data = response.data[crypto];
+                
+                // Format the response
+                const result = {
+                    cryptoCurrency: cryptoId,
+                    fiatCurrency: vsCurrency,
+                    rate: data[currency],
+                    marketCap: data[`${currency}_market_cap`],
+                    volume24h: data[`${currency}_24h_vol`],
+                    change24h: data[`${currency}_24h_change`],
+                    lastUpdated: new Date(data.last_updated_at * 1000).toISOString()
+                };
+                
+                // Return the result
+                return res.status(200).json({
+                    success: true,
+                    method: "getCurrentRate",
+                    data: result,
+                    timestamp: new Date()
+                });
+                
+            } catch (error) {
+                console.error('Error fetching current rate:', error);
+                
+                // Handle specific API errors
+                if (error.response) {
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "getCurrentRate",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+                }
+                
+                // Generic error response
+                return res.status(500).json({
+                    success: false,
+                    method: "getCurrentRate",
+                    message: "An error occurred while fetching the current exchange rate.",
+                    details: error.message
+                });
+            }
+        }
+    }
 
 }
 

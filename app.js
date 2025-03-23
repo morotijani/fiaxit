@@ -38,7 +38,7 @@ app.use('/v1/users', userRoutes)
 app.use('/v1/wallets', authenticate, walletRoutes)
 app.use('/v1/transactions', authenticate, transactionRoutes)
 app.use('/v1/trade', authenticate, tradeRoutes)
-app.use('/v1/converter', coverterRoutes)
+app.use('/v1/convert', coverterRoutes)
 
 // Error handling
 app.use((req, res, next) => {
