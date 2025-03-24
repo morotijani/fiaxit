@@ -476,7 +476,6 @@ class UsersController {
                     }
                 });
                 
-                
             } catch (error) {
                 console.error('Error in code verification:', error);
                 return res.status(500).json({ 
@@ -489,114 +488,266 @@ class UsersController {
         }
     } 
     
-  resetPassword = () => {
-    return async (req, res, next) => {
-        try {
-            const { resetToken, newPassword, confirmPassword } = req.body;
-            
-            if (!resetToken || !newPassword || !confirmPassword) {
-                return res.status(400).json({
-                    success: false,
-                    method: "resetPassword",
-                    message: "Missing required parameters: Reset token, new password, and confirm password are required."
-                });
-            }
-            
-            // Check if passwords match
-            if (newPassword !== confirmPassword) {
-                return res.status(400).json({
-                    success: false,
-                    method: "resetPassword",
-                    message: "Passwords do not match."
-                });
-            }
-            
-            // Check password strength
-            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
-            if (!passwordRegex.test(newPassword)) {
-                return res.status(422).json({
-                    success: false, 
-                    method: "resetPassword", 
-                    message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
-                });
-            }
-            
-            // Find the password reset record with the token that hasn't expired
-            const resetRecord = await UserForgetPassword.findOne({
-                where: {
-                    password_reset_token: resetToken, 
-                    password_reset_expires: { 
-                        [Op.gt]: new Date() // Op.gt means "greater than" - check if expiry is in the future
-                    }
+    resetPassword = () => {
+        return async (req, res, next) => {
+            try {
+                const { resetToken, newPassword, confirmPassword } = req.body;
+                
+                if (!resetToken || !newPassword || !confirmPassword) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "resetPassword",
+                        message: "Missing required parameters: Reset token, new password, and confirm password are required."
+                    });
                 }
-            });
-            
-            if (!resetRecord) {
-                return res.status(400).json({
-                    success: false,
-                    method: "resetPassword",
-                    message: "Invalid or expired reset token."
-                });
-            }
-            
-            // Find the user
-            const user = await User.findOne({
-                where: {
-                    user_id: resetRecord.password_reset_user_id
+                
+                // Check if passwords match
+                if (newPassword !== confirmPassword) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "resetPassword",
+                        message: "Passwords do not match."
+                    });
                 }
-            });
-            
-            if (!user) {
-                return res.status(404).json({
-                    success: false, 
-                    method: "resetPassword", 
-                    message: "User not found."
-                });
-            }
-            
-            // Update password
-            user.updatePassword = true; // Flag to trigger password hashing in your model hooks
-            user.user_password = newPassword;
-            await user.save();
-
-            // update user forget password table
-            await UserForgetPassword.update(
-                {
-                    password_reset_is_used: true, 
-                }, 
-                {
+                
+                // Check password strength
+                const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
+                if (!passwordRegex.test(newPassword)) {
+                    return res.status(422).json({
+                        success: false, 
+                        method: "resetPassword", 
+                        message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                    });
+                }
+                
+                // Find the password reset record with the token that hasn't expired
+                const resetRecord = await UserForgetPassword.findOne({
                     where: {
-                        password_reset_id: resetRecord.password_reset_id
+                        password_reset_token: resetToken, 
+                        password_reset_expires: { 
+                            [Op.gt]: new Date() // Op.gt means "greater than" - check if expiry is in the future
+                        }
                     }
+                });
+                
+                if (!resetRecord) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "resetPassword",
+                        message: "Invalid or expired reset token."
+                    });
                 }
-            )
-            
-            // Clear the reset record
-            await UserForgetPassword.destroy({
-                where: {
-                    password_reset_id: resetRecord.password_reset_id, 
-                    password_reset_user_id: resetRecord.password_reset_user_id, 
+                
+                // Find the user
+                const user = await User.findOne({
+                    where: {
+                        user_id: resetRecord.password_reset_user_id
+                    }
+                });
+                
+                if (!user) {
+                    return res.status(404).json({
+                        success: false, 
+                        method: "resetPassword", 
+                        message: "User not found."
+                    });
                 }
-            });
-            
-            return res.status(200).json({
-                success: true,
-                method: "resetPassword",
-                message: "Password has been reset successfully."
-            });
-            
-        } catch (error) {
-            console.error('Error in password reset:', error);
-            return res.status(500).json({
-                success: false,
-                method: "resetPassword",
-                message: "An error occurred while resetting the password.",
-                details: error.message
-            });
-        }
-    };
-}
+                
+                // Update password
+                user.updatePassword = true; // Flag to trigger password hashing in your model hooks
+                user.user_password = newPassword;
+                await user.save();
 
+                // update user forget password table
+                await UserForgetPassword.update(
+                    {
+                        password_reset_is_used: true, 
+                    }, 
+                    {
+                        where: {
+                            password_reset_id: resetRecord.password_reset_id
+                        }
+                    }
+                )
+                
+                // Clear the reset record
+                await UserForgetPassword.destroy({
+                    where: {
+                        password_reset_id: resetRecord.password_reset_id, 
+                        password_reset_user_id: resetRecord.password_reset_user_id, 
+                    }
+                });
+                
+                return res.status(200).json({
+                    success: true,
+                    method: "resetPassword",
+                    message: "Password has been reset successfully."
+                });
+                
+            } catch (error) {
+                console.error('Error in password reset:', error);
+                return res.status(500).json({
+                    success: false,
+                    method: "resetPassword",
+                    message: "An error occurred while resetting the password.",
+                    details: error.message
+                });
+            }
+        };
+    }
+
+    
+    submitKYC = () => {
+        return async (req, res, next) => {
+            try {
+                const userId = req.userData.user_id; // Get user ID from auth middleware
+                
+                // Find the user
+                const user = await User.findOne({
+                    where: {
+                        user_id: userId
+                    }
+                });
+                
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "submitKYC",
+                        message: "User not found."
+                    });
+                }
+                
+                // Check if required KYC fields are provided
+                const {
+                    idType,
+                    idNumber,
+                    documentFront,
+                    documentBack,
+                    selfie,
+                    address
+                } = req.body;
+                
+                if (!idType || !idNumber || !documentFront || !selfie) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "submitKYC",
+                        message: "Missing required KYC information. Please provide idType, idNumber, documentFront, and selfie."
+                    });
+                }
+                
+                // Validate address if provided
+                if (address && (!address.street || !address.city || !address.country)) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "submitKYC",
+                        message: "Address information is incomplete. Please provide street, city, and country."
+                    });
+                }
+                
+                // Check if user already has KYC information
+                if (user.kyc_status && user.kyc_status !== 'rejected') {
+                    return res.status(400).json({
+                        success: false,
+                        method: "submitKYC",
+                        message: `KYC verification is already ${user.kyc_status}. You cannot submit again.`
+                    });
+                }
+                
+                // In a production environment, you would:
+                // 1. Upload documents to secure storage (AWS S3, etc.)
+                // 2. Store document URLs rather than the actual documents
+                // For this implementation, we'll assume document handling is done elsewhere
+                
+                // Store KYC information in the user record
+                // Note: You'll need to add these fields to your User model
+                user.kyc_id_type = idType;
+                user.kyc_id_number = idNumber;
+                user.kyc_document_front = documentFront; // In production, store URL instead
+                user.kyc_document_back = documentBack; // In production, store URL instead
+                user.kyc_selfie = selfie; // In production, store URL instead
+                
+                // Store address information
+                if (address) {
+                    user.kyc_address_street = address.street;
+                    user.kyc_address_city = address.city;
+                    user.kyc_address_state = address.state || null;
+                    user.kyc_address_postal_code = address.postalCode || null;
+                    user.kyc_address_country = address.country;
+                }
+                
+                // Update KYC status
+                user.kyc_status = 'pending';
+                user.kyc_submitted_at = new Date();
+                
+                await user.save();
+                
+                return res.status(200).json({
+                    success: true,
+                    method: "submitKYC",
+                    message: "KYC information submitted successfully. Your verification is pending review."
+                });
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({
+                    success: false,
+                    method: "submitKYC",
+                    message: "An error occurred while submitting KYC information.", 
+                    details: error.message
+                });
+            }
+        }
+    }
+
+    // Get KYC status
+    getKYCStatus = () => {
+        return async (req, res, next) => {
+            try {
+                const userId = req.userData.user_id; // Get user ID from auth middleware
+                
+                // Find the user
+                const user = await User.findOne({
+                    where: {
+                        user_id: userId
+                    }
+                });
+                
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "getKYCStatus",
+                        message: "User not found."
+                    });
+                }
+                
+                // Check if user has submitted KYC
+                if (!user.kyc_status) {
+                    return res.status(200).json({
+                        success: true,
+                        method: "getKYCStatus",
+                        message: "KYC not submitted yet.", 
+                        kyc_status: "not_submitted"
+                    });
+                }
+                
+                // Return KYC status
+                return res.status(200).json({
+                    success: true,
+                    method: "getKYCStatus",
+                    message: "KYC status retrieved successfully.",
+                    kyc_status: user.kyc_status,
+                    kyc_submitted_at: user.kyc_submitted_at // Include submission date
+                });
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({
+                    success: false,
+                    method: "getKYCStatus",
+                    message: "An error occurred while retrieving KYC status.",
+                    details: error.message
+                });
+            }
+        }
+    }
 
     generateVerificationCode = () => {
         return Math.floor(Math.random() * (999999 - 100001)) + 100001;
