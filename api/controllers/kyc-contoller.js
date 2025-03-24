@@ -1,5 +1,5 @@
 const User = require('../models/user-model');
-const KYCModel = require('../models/kyc-model')
+const UserKyc = require('../models/user-kyc-model');
 const { v4: uuidv4 } = require('uuid')
 const nodemailer = require('nodemailer')
 const { Op } = require('sequelize');
@@ -47,8 +47,6 @@ class KYCController {
                     });
                 }
 
-                
-                
                 // Check if required KYC fields are provided
                 const {
                     idType,
@@ -75,13 +73,20 @@ class KYCController {
                         message: "KYC failed: Address information is incomplete. Please provide street, city, and country."
                     });
                 }
+
+                // check if user in the kyc table and merge it to user
+                const userKyc = await UserKyc.findOne({ // get user
+                    where: {
+                        kyc_for : user.user_id
+                    }
+                })
                 
                 // Check if user already has KYC information
-                if (user.kyc_status && user.kyc_status !== 'rejected') {
+                if (userKyc.kyc_status && userKyc.kyc_status !== 'rejected') {
                     return res.status(400).json({
-                        success: false,
-                        method: "submitKYC",
-                        message: `KYC failed: KYC verification is already ${user.kyc_status}. You cannot submit again.`
+                        success: false, 
+                        method: "submitKYC", 
+                        message: `KYC failed: KYC verification is already submitted with status ${userKyc.kyc_status}. You cannot submit again.`
                     });
                 }
                 
@@ -92,28 +97,28 @@ class KYCController {
                 
                 // Store KYC information in the user record
                 // Note: You'll need to add these fields to your User model
-                user.kyc_id_type = idType;
-                user.kyc_id_number = idNumber;
-                user.kyc_document_front = documentFront; // In production, store URL instead
-                user.kyc_document_back = documentBack; // In production, store URL instead
-                user.kyc_selfie = selfie; // In production, store URL instead
+                userKyc.kyc_id_type = idType;
+                userKyc.kyc_id_number = idNumber;
+                userKyc.kyc_document_front = documentFront; // In production, store URL instead
+                userKyc.kyc_document_back = documentBack; // In production, store URL instead
+                userKyc.kyc_selfie = selfie; // In production, store URL instead
                 
                 // Store address information
                 if (address) {
-                    user.kyc_address_street = address.street;
-                    user.kyc_address_city = address.city;
-                    user.kyc_address_state = address.state || null;
-                    user.kyc_address_postal_code = address.postalCode || null;
-                    user.kyc_address_country = address.country;
+                    userKyc.kyc_address_street = address.street;
+                    userKyc.kyc_address_city = address.city;
+                    userKyc.kyc_address_state = address.state || null;
+                    userKyc.kyc_address_postal_code = address.postalCode || null;
+                    userKyc.kyc_address_country = address.country;
                 }
                 
                 // Update KYC status
-                user.kyc_status = 'pending';
-                user.kyc_submitted_at = new Date();
+                userKyc.kyc_status = 'pending';
+                // userKyc.kyc_submitted_at = new Date();
                 
-                const insert = await user.save();
+                const save = await userKyc.save();
 
-                if (!insert) {
+                if (!save) {
                     return res.status(500).json({
                         success: false,
                         method: "submitKYC",
