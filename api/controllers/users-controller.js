@@ -36,71 +36,72 @@ class UsersController {
     
     signup = () => {
         return async (req, res, next) => {
-            const userId = uuidv4();
+            try {
+                const userId = uuidv4();
 
-            // check if email is a valid email
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(req.body.email)) {
-                return res.status(422).json({
-                    success: false, 
-                    method: "registerUser", 
-                    path: "email", 
-                    message: "Registration failed: Please enter a valid email address."
-                });
-            }
-
-            // check if email already exist
-            const isEmailExist = await User.findOne({
-                where: {
-                    user_email: req.body.email
+                // check if email is a valid email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(req.body.email)) {
+                    return res.status(422).json({
+                        success: false, 
+                        method: "registerUser", 
+                        path: "email", 
+                        message: "Registration failed: Please enter a valid email address."
+                    });
                 }
-            })
 
-            if (isEmailExist) {
-                return res.status(401).json({
+                // check if email already exist
+                const isEmailExist = await User.findOne({
+                    where: {
+                        user_email: req.body.email
+                    }
+                })
+
+                if (isEmailExist) {
+                    return res.status(401).json({
                     success: false, 
                     method: "registerUser", 
                     path: "email", 
                     message: "Registration failed: Email already exist."
                 })
-            }
+                }
 
-            // check for password length and characters
-            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
-            if (!passwordRegex.test(req.body.password)) {
-                return res.status(422).json({
-                    success: false, 
-                    method: "registerUser", 
-                    path: "password", 
-                    message: "Registration failed: Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
-                });
-            }
-
-            // check if password and confirm password is equal
-            if (req.body.password !== req.body.confirm_password) {
-                return res.status(422).json([
-                    {
+                // check for password length and characters
+                const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
+                if (!passwordRegex.test(req.body.password)) {
+                    return res.status(422).json({
+                        success: false, 
+                        method: "registerUser", 
                         path: "password", 
-                        message: "Registration failed: Passwords do not match."
-                    },
-                    {
-                        path: "confirm_password", 
-                        message: "Registration failed: Passwords do not match."
-                    }
-                ])
-            }
+                        message: "Registration failed: Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                    });
+                }
 
-            // check if pin is number and its length is 4
-            if (isNaN(req.body.pin) || req.body.pin.toString().length !== 4) {
-                return res.status(422).json({
-                    success: false, 
-                    method: "registerUser", 
-                    path: "pin", 
-                    message: "PIN must be a 4-digit number."
-                });
-            }
+                // check if password and confirm password is equal
+                if (req.body.password !== req.body.confirm_password) {
+                    return res.status(422).json([
+                        {
+                            path: "password", 
+                            message: "Registration failed: Passwords do not match."
+                        },
+                        {
+                            path: "confirm_password", 
+                            message: "Registration failed: Passwords do not match."
+                        }
+                    ])
+                }
 
-            try {
+                // check if pin is number and its length is 4
+                if (isNaN(req.body.pin) || req.body.pin.toString().length !== 4) {
+                    return res.status(422).json({
+                        success: false, 
+                        method: "registerUser", 
+                        path: "pin", 
+                        message: "PIN must be a 4-digit number."
+                    });
+                }
+
+            
                 const user = await User.create({
                     user_id: userId,
                     user_fname: req.body.fname,
@@ -112,6 +113,36 @@ class UsersController {
                     user_pin: req.body.pin, 
                     user_invitationcode: req.body.invitationcode || null // if invitation code is not provided, set to null
                 })
+
+                if (!user) {
+                    return res.status(422).json({
+                        success: false, 
+                        method: "registerUser", 
+                        message: "Registration failed: An error occured while registering user.", 
+                        details: error.message
+                    })
+                }
+
+                // send mail to user email to verify their account
+                const mailOptions = {
+                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,  
+                    to: user_email, 
+                    subject: 'Verify your account', 
+                    html: `Please click on the following link to verify your account: http://localhost:3000/api/users/verify/${user.user_id}/${user.user_pin}`
+                };
+
+                // Send the email
+                await transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.log('Error sending email:', error);
+                    } else {
+                        console.log('Email sent:', info.response);
+                    }
+                });
+
+                
+                // await transporter.sendMail(mailOptions);
+
                 res.status(200).json({
                     success: true, 
                     method: "registerUser", 
