@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const redis = require("redis");
 const User = require('../models/user-model');
+const UserKyc = require('../models/user-kyc-model');
 
 // Create Redis client
 let redisClient;
@@ -79,9 +80,22 @@ const authenticate = async(req, res, next) => {
             });
         }
         //return user;
-        
+
+        // check if user in the kyc table and merge it to user
+        const userKyc = await UserKyc.findOne({ // get user
+            where: {
+                kyc_for : decoded.user_id
+            }
+        })
+
         // Attach user data to request
-        req.userData = decoded;
+        req.userData = decoded || user;
+        
+        if (userKyc) {
+            // merge userKyc to user
+            req.userData = { ...user, ...userKyc };
+        }
+        
         req.token = token; // Store token for potential use in other middleware/controllers
         
         // Continue to the next middleware/router handler
