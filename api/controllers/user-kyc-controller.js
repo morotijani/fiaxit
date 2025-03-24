@@ -46,30 +46,47 @@ class KYCController {
                 }
 
                 // Check if required KYC fields are provided
-                const {
-                    idType,
-                    idNumber,
-                    documentFront,
-                    documentBack,
-                    selfie,
-                    address
-                } = req.body;
+                // const {
+                //     kyc_id_type,
+                //     kyc_id_number,
+                //     kyc_document_front,
+                //     kyc_document_back,
+                //     kyc_selfie,
+                //     address
+                // } = req.body;
                 
-                if (!idType || !idNumber || !documentFront || !selfie) {
-                    return res.status(400).json({
-                        success: false,
-                        method: "submitKYC",
-                        message: "KYC failed: Missing required KYC information. Please provide kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, and kyc_selfie."
-                    });
+                // if (!kyc_id_type || !kyc_id_number || !kyc_document_front || !kyc_document_back || !kyc_selfie) {
+                //     return res.status(400).json({
+                //         success: false,
+                //         method: "submitKYC",
+                //         message: " Please provide kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, and kyc_selfie."
+                //     });
+                // }
+
+                // validate required fields
+                const requiredFields = ['kyc_id_type', 'kyc_id_number', 'kyc_document_front', 'kyc_document_back', 'kyc_selfie', 'address'];
+                for (const field of requiredFields) {
+                    if (!req.body[field]) {
+                        return res.status(400).json({
+                            success: false, 
+                            method: "submitKYC", 
+                            message: `KYC failed: Missing required KYC information. Please provide the following: ${field}`
+                        });
+                    }
                 }
                 
                 // Validate address if provided
-                if (address && (!address.street || !address.city || !address.country)) {
-                    return res.status(400).json({
-                        success: false,
-                        method: "submitKYC",
-                        message: "KYC failed: Address information is incomplete. Please provide street, city, and country."
-                    });
+                if (address) {
+                    const requiredAddressFields = ['kyc_street', 'kyc_city', 'kyc_country'];
+                    for (const field of requiredAddressFields) {
+                        if (!address[field]) {
+                            return res.status(400).json({
+                                success: false,
+                                method: "submitKYC",
+                                message: `KYC failed: Missing required address information. Please provide the following: ${field}`
+                            });
+                        }
+                    }
                 }
 
                 // check if user in the kyc table and merge it to user
