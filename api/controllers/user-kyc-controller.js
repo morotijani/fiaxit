@@ -172,9 +172,19 @@ class KYCController {
                         message: "User not found."
                     });
                 }
+
+                // check if user in the kyc table and merge it to user
+                const userKyc = await UserKyc.findOne({ // get user
+                    where: {
+                        kyc_for : user.user_id
+                    }
+                })
+                
+                // Check if user already has KYC information
+                // if (userKyc && userKyc.kyc_status !== 'rejected') {}
                 
                 // Check if user has submitted KYC
-                if (!user.kyc_status) {
+                if (!userKyc) {
                     return res.status(200).json({
                         success: true,
                         method: "getKYCStatus",
@@ -188,8 +198,8 @@ class KYCController {
                     success: true,
                     method: "getKYCStatus",
                     message: "KYC status retrieved successfully.",
-                    kyc_status: user.kyc_status,
-                    kyc_submitted_at: user.kyc_submitted_at // Include submission date
+                    kyc_status: userKyc.kyc_status,
+                    kyc_submitted_at: userKyc.createdAt // Include submission date
                 });
             } catch (error) {
                 console.error(error);
