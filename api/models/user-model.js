@@ -5,7 +5,8 @@ const mysql = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.en
     dialect: process.env.DB_DIALECT, 
     pool: { // instead of closing database connection every time it opens when it runs a query, it will keep a pool of conections open and ready so once it connects it will keep it open when it is done and future queries that come in will use those open connection
         min: 0, 
-        max: 5
+        max: 5, 
+        idle: 10000 // specifies the maximum time, in milliseconds, that a connection can remain idle (unused) before being released back to the pool
     }, 
     logging: process.env.NODE_ENV === 'development' ? console.log : false // Only log in development
 })

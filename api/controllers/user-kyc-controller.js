@@ -28,6 +28,7 @@ class KYCController {
     submitKYC = () => {
         return async (req, res, next) => {
             try {
+                const { kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, kyc_selfie, address } = req.body; // Get address from request body
                 const userId = req.userData.user_id; // Get user ID from auth middleware
                 
                 // Find the user
@@ -35,8 +36,8 @@ class KYCController {
                     where: {
                         user_id: userId
                     }
-                });
-                
+                })
+
                 if (!user) {
                     return res.status(404).json({
                         success: false,
@@ -46,23 +47,6 @@ class KYCController {
                 }
 
                 // Check if required KYC fields are provided
-                // const {
-                //     kyc_id_type,
-                //     kyc_id_number,
-                //     kyc_document_front,
-                //     kyc_document_back,
-                //     kyc_selfie,
-                //     address
-                // } = req.body;
-                
-                // if (!kyc_id_type || !kyc_id_number || !kyc_document_front || !kyc_document_back || !kyc_selfie) {
-                //     return res.status(400).json({
-                //         success: false,
-                //         method: "submitKYC",
-                //         message: " Please provide kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, and kyc_selfie."
-                //     });
-                // }
-
                 // validate required fields
                 const requiredFields = ['kyc_id_type', 'kyc_id_number', 'kyc_document_front', 'kyc_document_back', 'kyc_selfie', 'address'];
                 for (const field of requiredFields) {
@@ -77,7 +61,7 @@ class KYCController {
                 
                 // Validate address if provided
                 if (address) {
-                    const requiredAddressFields = ['kyc_street', 'kyc_city', 'kyc_country'];
+                    const requiredAddressFields = ['kyc_address', 'kyc_street', 'kyc_city', 'kyc_country'];
                     for (const field of requiredAddressFields) {
                         if (!address[field]) {
                             return res.status(400).json({
@@ -97,7 +81,7 @@ class KYCController {
                 })
                 
                 // Check if user already has KYC information
-                if (userKyc.kyc_status && userKyc.kyc_status !== 'rejected') {
+                if (userKyc && userKyc.kyc_status !== 'rejected') {
                     return res.status(400).json({
                         success: false, 
                         method: "submitKYC", 
@@ -108,34 +92,26 @@ class KYCController {
                 // In a production environment, you would:
                 // 1. Upload documents to secure storage (AWS S3, etc.)
                 // 2. Store document URLs rather than the actual documents
-                // For this implementation, we'll assume document handling is done elsewhere
-                
-                // Store KYC information in the user record
-                // Note: You'll need to add these fields to your User model
-                userKyc.kyc_id = uuidv4();
-                userKyc.kyc_for = user.user_id;
-                userKyc.kyc_id_type = idType;
-                userKyc.kyc_id_number = idNumber;
-                userKyc.kyc_document_front = documentFront; // In production, store URL instead
-                userKyc.kyc_document_back = documentBack; // In production, store URL instead
-                userKyc.kyc_selfie = selfie; // In production, store URL instead
-                
-                // Store address information
-                if (address) {
-                    userKyc.kyc_street = address.street;
-                    userKyc.kyc_city = address.city;
-                    userKyc.kyc_state = address.state || null;
-                    userKyc.kyc_postal_code = address.postalCode || null;
-                    userKyc.kyc_country = address.country;
-                }
-                
-                // Update KYC status
-                userKyc.kyc_status = 'pending';
 
-                // save user kyc data
-                const save = await userKyc.save();
+                // Create a new UserKyc record if one doesn't exist or if the previous one was rejected.
+                const newKycRecord = await UserKyc.create({
+                    kyc_id: uuidv4(), 
+                    kyc_for: user.user_id, 
+                    kyc_id_type: kyc_id_type, 
+                    kyc_id_number: kyc_id_number, 
+                    kyc_document_front: kyc_document_front, // In production, store URL instead
+                    kyc_document_back: kyc_document_back,   // In production, store URL instead
+                    kyc_selfie: kyc_selfie,                // In production, store URL instead
+                    kyc_address: address ? address.kyc_address : null, 
+                    kyc_street: address ? address.kyc_street : null, 
+                    kyc_city: address ? address.kyc_city : null, 
+                    kyc_state: address ? address.kyc_state : null || null, 
+                    kyc_postal_code: address ? address.kyc_postal_code: null || null, 
+                    kyc_country: address ? address.kyc_country : null,
+                    kyc_status: 'pending'
+                });
 
-                if (!save) {
+                if (!newKycRecord) {
                     return res.status(500).json({
                         success: false,
                         method: "submitKYC",

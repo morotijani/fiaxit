@@ -88,14 +88,14 @@ const authenticate = async(req, res, next) => {
             }
         })
 
+        // if (userKyc) {
+            // merge userKyc to user
+        //     req.userData = { ...user, ...userKyc };
+        // }
+        
+
         // Attach user data to request
         req.userData = decoded || user;
-        
-        if (userKyc) {
-            // merge userKyc to user
-            req.userData = { ...user, ...userKyc };
-        }
-        
         req.token = token; // Store token for potential use in other middleware/controllers
         
         // Continue to the next middleware/router handler
