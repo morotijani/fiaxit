@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/users-controller');
+const UserKYCController = require('../controllers/user-kyc-controller');
 const userAuth = require("../middleware/check-auth");
 
 // Usage (example): PATCH /api/v1/update/:id
@@ -29,20 +30,20 @@ router.patch('/update/:id', userAuth.authenticate, UserController.update()); // 
     *   documentBack: "base64_encoded_image",
     *   selfie: "base64_encoded_image",
     *   address: {
-    *     street: "",
-    *     city: "",
-    *     state: "",
-    *     postalCode: "",
-    *     country: ""
-    *   }
+    *       street: "",
+    *       city: "",
+    *       state: "",
+    *       postalCode: "",
+    *       country: ""
+    *      }
     * }
 */
-router.post('/kyc/submit', userAuth.authenticate, UserController.submitKYC());
+router.post('/kyc/submit', userAuth.authenticate, UserKYCController.submitKYC());
 
 // Get KYC status
-router.get('/kyc/status', userAuth.authenticate, UserController.getKYCStatus());
+router.get('/kyc/status', userAuth.authenticate, UserKYCController.getKYCStatus());
 
 // Admin route to verify KYC (requires admin privileges)
-router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, UserController.verifyKYC());
+// router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, UserKYCController.verifyKYC());
 
 module.exports = router;

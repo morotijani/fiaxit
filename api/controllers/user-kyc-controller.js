@@ -2,8 +2,6 @@ const User = require('../models/user-model');
 const UserKyc = require('../models/user-kyc-model');
 const { v4: uuidv4 } = require('uuid')
 const nodemailer = require('nodemailer')
-const { Op } = require('sequelize');
-
 
 // Configure email transporter
 const transporter = nodemailer.createTransport({
@@ -61,7 +59,7 @@ class KYCController {
                     return res.status(400).json({
                         success: false,
                         method: "submitKYC",
-                        message: "KYC failed: Missing required KYC information. Please provide idType, idNumber, documentFront, and selfie."
+                        message: "KYC failed: Missing required KYC information. Please provide kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, and kyc_selfie."
                     });
                 }
                 
@@ -97,6 +95,8 @@ class KYCController {
                 
                 // Store KYC information in the user record
                 // Note: You'll need to add these fields to your User model
+                userKyc.kyc_id = uuidv4();
+                userKyc.kyc_for = user.user_id;
                 userKyc.kyc_id_type = idType;
                 userKyc.kyc_id_number = idNumber;
                 userKyc.kyc_document_front = documentFront; // In production, store URL instead
@@ -105,17 +105,17 @@ class KYCController {
                 
                 // Store address information
                 if (address) {
-                    userKyc.kyc_address_street = address.street;
-                    userKyc.kyc_address_city = address.city;
-                    userKyc.kyc_address_state = address.state || null;
-                    userKyc.kyc_address_postal_code = address.postalCode || null;
-                    userKyc.kyc_address_country = address.country;
+                    userKyc.kyc_street = address.street;
+                    userKyc.kyc_city = address.city;
+                    userKyc.kyc_state = address.state || null;
+                    userKyc.kyc_postal_code = address.postalCode || null;
+                    userKyc.kyc_country = address.country;
                 }
                 
                 // Update KYC status
                 userKyc.kyc_status = 'pending';
-                // userKyc.kyc_submitted_at = new Date();
-                
+
+                // save user kyc data
                 const save = await userKyc.save();
 
                 if (!save) {

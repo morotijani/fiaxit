@@ -34,7 +34,7 @@ app.use((req, res, next) => {
 app.use('/v1/contacts', contactRoutes)
 app.use('/v1/todos', todoRoutes)
 app.use('/v1/auth', authRoutes)
-app.use('/v1/users', userRoutes)
+app.use('/v1/user', userRoutes)
 app.use('/v1/wallets', authenticate, walletRoutes)
 app.use('/v1/transactions', authenticate, transactionRoutes)
 app.use('/v1/trade', authenticate, tradeRoutes)
