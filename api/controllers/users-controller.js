@@ -38,6 +38,7 @@ class UsersController {
         return async (req, res, next) => {
             try {
                 const userId = uuidv4();
+                const vericode = uuidv4(); // Generate a random code for email verification code
 
                 // check if email is a valid email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -100,8 +101,7 @@ class UsersController {
                         message: "PIN must be a 4-digit number."
                     });
                 }
-
-            
+                
                 const user = await User.create({
                     user_id: userId,
                     user_fname: req.body.fname,
@@ -111,6 +111,7 @@ class UsersController {
                     user_phone: req.body.phone || null, // if phone is not provided, set to null
                     user_password: req.body.password, 
                     user_pin: req.body.pin, 
+                    user_vericode: vericode, 
                     user_invitationcode: req.body.invitationcode || null // if invitation code is not provided, set to null
                 })
 
@@ -128,7 +129,14 @@ class UsersController {
                     from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,  
                     to: user_email, 
                     subject: 'Verify your account', 
-                    html: `Please click on the following link to verify your account: http://localhost:3000/api/users/verify/${user.user_id}/${user.user_pin}`
+                    html: `
+                        <h3>${req.body.fname}</h3>
+                        <p>Thank you for registering with Fiaxit 👻. Please click on the following link to verify your account: https://sites.local:6000/api/user/verify/${userId}/${vericode}
+                        <br>
+                        With love,
+                        <br>
+                        - Fiaxit 👻
+                    `
                 };
 
                 // Send the email
@@ -140,7 +148,6 @@ class UsersController {
                     }
                 });
 
-                
                 // await transporter.sendMail(mailOptions);
 
                 res.status(200).json({
@@ -157,6 +164,67 @@ class UsersController {
                     message: "Registration failed: An error occured while registering user.", 
                     details: error.message
                 })
+            }
+        }
+    }
+
+    // verify user account
+    verify = () => {
+        return async (req, res, next) => {
+            try {
+                const uid = req.params.id;
+                const code = req.params.code
+
+                // check if user id exist 
+                const user = await User.findOne({
+                    where: {
+                        id: uid
+                    }
+                })
+
+                if (!user) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "verifyUser", 
+                        message: "User not found"
+                    })
+                }
+
+                // check if code provided exist and if it tallys with user data
+                if (user.user_vericode !== code) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "verifyUser", 
+                        message: "Invalid verification code"
+                    })
+                }
+
+                // update user data
+                user.user_verified = true
+                user.user_vericode = null
+                user.save()
+
+                res.status(200).json({
+                    success: true, 
+                    method: "verifyUser", 
+                    data: user
+                })
+            } catch (error) {
+                return res.status(500).json({
+                    success: false, 
+                    method: "verifyUser", 
+                    message: "An error occured while verifying user.", 
+                    details: error.message
+                })
+            }
+        }
+    }
+
+    // login user
+    login = () => {
+        return async (req, res, next) => {
+            try {
+                const msg =
             }
         }
     }

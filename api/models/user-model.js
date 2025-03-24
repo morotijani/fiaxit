@@ -58,6 +58,14 @@ const User = mysql.define('fiaxit_users', {
             }
         }
     }, 
+    user_vericode: {
+        type: DataTypes.STRING(50), 
+        allowNull: false
+    }, 
+    user_verified: {
+        type: DataTypes.BOOLEAN, 
+        defaultValue: false
+    }, 
     user_invitationcode: {
         type: DataTypes.STRING(50)
     }, 
