@@ -4,7 +4,7 @@ const UserController = require('../controllers/users-controller');
 const UserKYCController = require('../controllers/user-kyc-controller');
 const userAuth = require("../middleware/check-auth");
 
-router.get('verify/:id/:code', UserController.verify()); // verify user
+router.get('/verify/:id/:code', UserController.verify()); // verify user
 
 // Usage (example): PATCH /api/v1/update/:id
 /** body
