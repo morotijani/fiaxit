@@ -215,7 +215,7 @@ class UsersController {
 
                 // update user data
                 user.user_verified = true
-                user.user_vericode = null
+                // user.user_vericode = null
                 const save = user.save()
 
                 if (!save) {
@@ -233,10 +233,8 @@ class UsersController {
                     to: user.user_email, 
                     subject: 'Welcome to the app!', 
                     html: `
-                        <h3>Hello ${user.user_name},</h3>
+                        <h3>Hello ${user.user_fname},</h3>
                         <p>Thank you for registering with us. We are excited to have you on board.</p>
-                        <p>Welcome to the app! We are excited to have you on board.</p>
-                        <br>
                         <br>
                         Best regards,
                         <br>
@@ -244,13 +242,13 @@ class UsersController {
                     `
                 };
 
-                // transporter.sendMail(mailOptions, (error, info) => {
-                //     if (error) {
-                //         console.log('Error sending email:', error);
-                //     } else {
-                //         console.log('Email sent:', info.response);
-                //     }
-                // });                
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.log('Error sending email:', error);
+                    } else {
+                        console.log('Email sent:', info.response);
+                    }
+                });
 
                 res.status(200).json({
                     success: true, 
