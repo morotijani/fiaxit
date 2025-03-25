@@ -48,7 +48,7 @@ class UsersController {
                         success: false, 
                         method: "registerUser", 
                         path: "email", 
-                        message: "Registration failed: Please enter a valid email address."
+                        message: "User registration failed: Please enter a valid email address."
                     });
                 }
 
@@ -64,7 +64,7 @@ class UsersController {
                     success: false, 
                     method: "registerUser", 
                     path: "email", 
-                    message: "Registration failed: Email already exist."
+                    message: "User registration failed: Email already exist."
                 })
                 }
 
@@ -75,7 +75,7 @@ class UsersController {
                         success: false, 
                         method: "registerUser", 
                         path: "password", 
-                        message: "Registration failed: Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                        message: "User registration failed: Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
                     });
                 }
 
@@ -84,11 +84,11 @@ class UsersController {
                     return res.status(422).json([
                         {
                             path: "password", 
-                            message: "Registration failed: Passwords do not match."
+                            message: "User registration failed: Passwords do not match."
                         },
                         {
                             path: "confirm_password", 
-                            message: "Registration failed: Passwords do not match."
+                            message: "User registration failed: Passwords do not match."
                         }
                     ])
                 }
@@ -120,8 +120,7 @@ class UsersController {
                     return res.status(422).json({
                         success: false, 
                         method: "registerUser", 
-                        message: "Registration failed: An error occured while registering user.", 
-                        details: error.message
+                        message: "User registration failed: An error occured while registering user.", 
                     })
                 }
 
@@ -157,9 +156,8 @@ class UsersController {
                 res.status(200).json({
                     success: true, 
                     method: "registerUser", 
-                    data: {
-                        user: user
-                    }
+                    data: user, 
+                    timeStamp: new Date().toISOString()
                 })
             } catch(error) {
                 console.error('Error in register user:', error)
@@ -191,7 +189,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
-                        message: "User not found"
+                        message: "Verification failed: User not found"
                     })
                 }
 
@@ -200,7 +198,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
-                        message: "Invalid verification code"
+                        message: "Verification failed: Invalid verification code"
                     })
                 }
 
@@ -209,7 +207,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
-                        message: "You are already verified"
+                        message: "Verification failed: You are already verified"
                     })
                 }
 
@@ -221,8 +219,7 @@ class UsersController {
                     return res.status(500).json({
                         success: false, 
                         method: "verifyUser", 
-                        message: "An error occured while verifying user.", 
-                        details: error.message
+                        message: "Verification failed: An error occured while verifying user.", 
                     })
                 }
 
@@ -260,7 +257,7 @@ class UsersController {
                 return res.status(500).json({
                     success: false, 
                     method: "verifyUser", 
-                    message: "An error occured while verifying user.", 
+                    message: "Verification failed: An error occured while verifying user.", 
                     details: error.message
                 })
             }
@@ -297,7 +294,7 @@ class UsersController {
                             return res.status(401).json({
                                 success: false, 
                                 method: "login", 
-                                message: "Login failed: User not verified, please verify your account."
+                                message: "User login failed: User not verified, please verify your account."
                             })
                         }
                             
@@ -309,13 +306,14 @@ class UsersController {
                         resp.success = true;
                         resp.method = "login";
                         resp.errors = [];
-                        resp.token = token
+                        resp.token = token, 
+                        resp.timeStamp = new Date().toISOString()
                     }
                 } else {
                     return res.status(401).json({
                         success: false,
                         method: "userLogin",
-                        message: "Login failed: User not found."
+                        message: "User login failed: User not found."
                     })
                 }
                 res.status(200).json(resp)
@@ -323,7 +321,7 @@ class UsersController {
                 return res.status(500).json({
                     success: false, 
                     method: "userLogin", 
-                    message: "Login failed: An error occurred while logging in the user.", 
+                    message: "User login failed: An error occurred while logging in the user.", 
                     details: error.message
                 });
             }
@@ -384,7 +382,19 @@ class UsersController {
                     from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,  
                     to: email, 
                     subject: "Fiaxit 👻 Verification Code", 
-                    text: `Your verification code is: ${vericode}`
+                    html: `
+                        <h3>${user.user_fname},</h3>
+                        <p>Thank you for registering. Please verify your account by clicking on the link below: 
+                        <br>
+                        <a href="http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}" target="_blank">http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}</a>, or copy and paste the link into your browser's address bar; http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}
+                        <br>
+                        <p>If you did not create an account with us, please ignore this email.
+                        <br>
+                        With love,
+                        <br>
+                        - Fiaxit 👻
+                        </p>
+                    `
                 };
 
                 transporter.sendMail(mailOptions, (error, info) => {
@@ -400,7 +410,8 @@ class UsersController {
                         return res.status(200).json({
                             success: true, 
                             method: "resendVericode", 
-                            message: "Verification code sent successfully."
+                            message: "Verification code sent successfully.", 
+                            timeStamp: new Date().toISOString()
                         });
                     }
                 });
@@ -409,22 +420,9 @@ class UsersController {
                 return res.status(500).json({
                     success: false, 
                     method: "resendVericode", 
-                    message: "Resend verification failed: Internal server error."
+                    message: "Resend verification failed: Internal server error.", 
+                    details: error.message
                 });
-            }
-        }
-    }
-
-    verifyUser = async (req, res, next) => {
-        try {
-            const { vericode } = req.body;
-            const { email } = req.body;
-
-            if (!vericode || !email) {
-                return res.status(400).json({
-                    success: false, 
-                    method: "verifyUser", 
-                    message: "Verification failed: Verification code or
             }
         }
     }
@@ -437,7 +435,7 @@ class UsersController {
                     return res.status(401).json({
                         success: false, 
                         method: "userLogout", 
-                        message: "Logout failed: No authentication token provided."
+                        message: "User logout failed: No authentication token provided."
                     });
                 }
 
@@ -446,13 +444,14 @@ class UsersController {
                     res.status(200).json({
                         success: true, 
                         method: "userLogout", 
-                        message: "Logout successful: Token blacklisted. User has been logged out."       
+                        message: "User logout successful: Token blacklisted. User has been logged out.", 
+                        timeStamp: new Date().toISOString()      
                     });
                 } else {
                     res.status(400).json({
                         success: false, 
                         method: "userLogout",
-                        message: "Logout failed (Could not blacklist token): An error occurred while logging out the user.",
+                        message: "User logout failed (Could not blacklist token): An error occurred while logging out the user.",
                         error: error.message
                     });
                 }
@@ -460,7 +459,7 @@ class UsersController {
                 res.status(500).json({
                     success: false, 
                     method: "userLogout",
-                    message: "Logout failed: An error occurred while logging out the user.",
+                    message: "User logout failed: An error occurred while logging out the user.",
                     error: error.message
                 });
             }
