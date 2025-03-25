@@ -213,7 +213,11 @@ class UsersController {
 
                 // update user data
                 user.user_verified = true
-                const save = user.save()
+                const save = user.save({
+                    where: {
+                        user_id: uid
+                    }
+                })
 
                 if (!save) {
                     return res.status(500).json({
@@ -303,6 +307,41 @@ class UsersController {
                         const token = await jwt.sign(signVals, process.env.JWT_KEY, {
                             expiresIn: "7d"
                         });
+
+                        // send email to log in user
+
+                        const mailOptions = {
+                            from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,  
+                            to: req.body.email, 
+                            subject: 'Login Notification', 
+                            html: `
+                                <h3>Hello ${user.user_fname},</h3>
+                                <p>We detected a recent sign-in to your Fiaxit Account.</p>
+                                <p><b>Sign-in details<b>:</b></p>
+                                <b>IP Address</b>: ${req.ip}
+                                <br>
+                                <b>Browser</b>: ${req.headers['user-agent']}
+                                <br>
+                                <b>Device</b>: ${req.headers['user-agent']}
+                                <br>
+                                <b>Time</b>: ${new Date()}
+                                <br>
+                                <br>
+                                If you did not initiate this sign-in, please contact our support team immediately.</p>
+                                <br><br>
+                                <p>Thank you for using Fiaxit 👻.</p>
+                            `
+                        };
+        
+                        // Send the email
+                        await transporter.sendMail(mailOptions, (error, info) => {
+                            if (error) {
+                                console.log('Error sending email:', error);
+                            } else {
+                                console.log('Email sent:', info.response);
+                            }
+                        });
+
                         resp.success = true;
                         resp.method = "login";
                         resp.errors = [];
