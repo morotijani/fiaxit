@@ -6,6 +6,9 @@ const userAuth = require("../middleware/check-auth");
 
 router.get('/verify/:id/:code', UserController.verify()); // verify user
 
+// resend verification code
+router.post('/resend-vericode', UserController.resendVericode()); // resend verification code
+
 // Usage (example): PATCH /api/v1/update/:id
 /** body
  * {

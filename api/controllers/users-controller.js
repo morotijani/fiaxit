@@ -215,7 +215,6 @@ class UsersController {
 
                 // update user data
                 user.user_verified = true
-                // user.user_vericode = null
                 const save = user.save()
 
                 if (!save) {
@@ -293,6 +292,15 @@ class UsersController {
                 if (user) {
                     const passed = await bcrypt.compare(password, user.user_password)
                     if (passed) {
+                        // check if user is verified or not
+                        if (!user.user_verified) {
+                            return res.status(401).json({
+                                success: false, 
+                                method: "login", 
+                                message: "Login failed: User not verified, please verify your account."
+                            })
+                        }
+                            
                         const signVals = user.toJSON(); //
                         delete signVals.password // remove password from the signvals
                         const token = await jwt.sign(signVals, process.env.JWT_KEY, {
@@ -307,7 +315,7 @@ class UsersController {
                     return res.status(401).json({
                         success: false,
                         method: "userLogin",
-                        message: "User not found."
+                        message: "Login failed: User not found."
                     })
                 }
                 res.status(200).json(resp)
@@ -315,9 +323,108 @@ class UsersController {
                 return res.status(500).json({
                     success: false, 
                     method: "userLogin", 
-                    message: "An error occurred while logging in the user.", 
+                    message: "Login failed: An error occurred while logging in the user.", 
                     details: error.message
                 });
+            }
+        }
+    }
+
+    resendVericode = () => {
+        return async (req, res, next) => {
+            try {
+                const email = req.body.email;
+                const vericode = uuidv4(); // generate verification code
+
+                // check if email is a valid emailaddress
+                if (!email) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "resendVericode", 
+                        message: "Resend verification failed: Email is not provided."
+                    });
+                }
+
+                // check if email is a valid emailaddress
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "resendVericode", 
+                        message: "Resend verification failed: Email is not valid."
+                    });
+                }
+
+                // check if email exist
+                const user = await User.findOne({
+                    where: {
+                        user_email: email
+                    }
+                });
+
+                if (!user) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "resendVericode", 
+                        message: "Resend verification failed: User not found."
+                    });
+                }
+
+                // update user's verification code
+                await User.update({
+                    user_vericode : vericode
+                }, {
+                    where: {
+                        user_email : email
+                    }
+                });
+
+                // send verification code to user
+                const mailOptions = {
+                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,  
+                    to: email, 
+                    subject: "Fiaxit 👻 Verification Code", 
+                    text: `Your verification code is: ${vericode}`
+                };
+
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.log('Email sending error:', error);
+                            return res.status(500).json({
+                            success: false, 
+                            method: "resendVericode", 
+                            message: "Resend verification failed: Email sending error."
+                        });
+                    } else {
+                        console.log('Email sent:', info.response);
+                        return res.status(200).json({
+                            success: true, 
+                            method: "resendVericode", 
+                            message: "Verification code sent successfully."
+                        });
+                    }
+                });
+            } catch(error) {
+                console.error('Error in resend verification code:', error);
+                return res.status(500).json({
+                    success: false, 
+                    method: "resendVericode", 
+                    message: "Resend verification failed: Internal server error."
+                });
+            }
+        }
+    }
+
+    verifyUser = async (req, res, next) => {
+        try {
+            const { vericode } = req.body;
+            const { email } = req.body;
+
+            if (!vericode || !email) {
+                return res.status(400).json({
+                    success: false, 
+                    method: "verifyUser", 
+                    message: "Verification failed: Verification code or
             }
         }
     }
