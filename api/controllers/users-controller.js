@@ -132,9 +132,9 @@ class UsersController {
                     html: `
                         <h3>${req.body.fname},</h3>
                         <p>Thank you for registering with Fiaxit 👻. 
-                        <br>Please click on the following link to verify your account: <a href="http://sites.local:6000/v1/user/verify/${userId}/${vericode}" target="_blank">http://sites.local:6000/v1/user/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
+                        <br>Please click on the following link to verify your account: <a href="http://sites.local:6000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:6000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
                         <br>
-                        http://sites.local:6000/v1/user/verify/${userId}/${vericode}
+                        http://sites.local:6000/v1/auth/verify/${userId}/${vericode}
                         <br>
                         <br>
                         With love,
@@ -225,7 +225,7 @@ class UsersController {
 
                 // send welcome email to user
                 const mailOptions = {
-                    from: process.env.EMAIL_USERNAME, 
+                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME, 
                     to: user.user_email, 
                     subject: 'Welcome to the app!', 
                     html: `
@@ -360,6 +360,15 @@ class UsersController {
                     }
                 });
 
+                // check if user is already verified
+                if (user && user.user_verified) {
+                    return res.status(400).json({
+                        success: false, 
+                        method: "resendVericode", 
+                        message: "Resend verification failed: User is already verified."
+                    });
+                }
+
                 if (!user) {
                     return res.status(400).json({
                         success: false, 
@@ -384,12 +393,12 @@ class UsersController {
                     subject: "Fiaxit 👻 Verification Code", 
                     html: `
                         <h3>${user.user_fname},</h3>
-                        <p>Thank you for registering. Please verify your account by clicking on the link below: 
-                        <br>
-                        <a href="http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}" target="_blank">http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}</a>, or copy and paste the link into your browser's address bar; http://sites.local:6000/v1/user/verify/${user.user_id}/${vericode}
+                        <p>Thank you for registering.</p>
+                        <p>Please verify your account by clicking on the this <a href="http://sites.local:6000/v1/auth/verify/${user.user_id}/${vericode}" target="_blank">link</a></p>
+                        <p>or copy and paste the link into your browser's address bar; http://sites.local:6000/v1/auth/verify/${user.user_id}/${vericode}
                         <br>
                         <p>If you did not create an account with us, please ignore this email.
-                        <br>
+                        <br><br>
                         With love,
                         <br>
                         - Fiaxit 👻
@@ -527,8 +536,8 @@ class UsersController {
                 const resp = {
                     success: false, 
                     method: "loggedInUser", 
-                    data: {user: null}, 
-                    message: "User not found."
+                    data: { user: null }, 
+                    message: "Logged in user failed: User not found."
                 }
             
                 const user = req.userData
@@ -537,8 +546,9 @@ class UsersController {
 
                 resp.success = true;
                 resp.method =  "loggedInUser";
-                resp.data = {user: data};
                 resp.message = "User is logged in.";
+                resp.data = data;
+                resp.timeStamp = new Date().toISOString();
 
                 res.status(200).json(resp);
             } catch(error) {

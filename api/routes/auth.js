@@ -17,7 +17,12 @@ const userAuth = require("../middleware/check-auth");
         "invitationcode": "" // not compulsory
     }
 */
-router.post('/signup', AuthController.signup()); // Register users
+router.post('/signup', AuthController.signup()); // Register user
+
+router.get('/verify/:id/:code', AuthController.verify()); // verify user
+
+// resend verification code
+router.post('/resend-vericode', AuthController.resendVericode()); // resend verification code
 
 // Usage (example): POST /api/v1/login
 /** body
