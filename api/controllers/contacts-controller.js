@@ -26,10 +26,11 @@ class ContactsController {
             try {
                 const userId = req.userData.user_id
                 const contact = await Contact.create({
-                    fname: req.body.fname,
-                    lname: req.body.lname,
-                    email: req.body.email,
-                    phone: req.body.phone,
+                    fname: req.body.fname, 
+                    lname: req.body.lname, 
+                    email: req.body.email, 
+                    phone: req.body.phone, 
+                    message: req.body.message, 
                     user_id: userId
                 });
                 res.status(200).json({
@@ -91,7 +92,8 @@ class ContactsController {
                         fname: req.body.fname,
                         lname: req.body.lname,
                         email: req.body.email,
-                        phone: req.body.phone
+                        phone: req.body.phone, 
+                        message: req.body.message
                     }
                     await Contact.update(
                         vals, 

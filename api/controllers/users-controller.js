@@ -343,7 +343,7 @@ class UsersController {
                         });
 
                         resp.success = true;
-                        resp.method = "login";
+                        resp.method = "userLogin";
                         resp.errors = [];
                         resp.token = token, 
                         resp.timeStamp = new Date().toISOString()
@@ -352,7 +352,8 @@ class UsersController {
                     return res.status(401).json({
                         success: false,
                         method: "userLogin",
-                        message: "User login failed: User not found."
+                        message: "User login failed: User not found.", 
+                        path: "email"
                     })
                 }
                 res.status(200).json(resp)
