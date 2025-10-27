@@ -20,4 +20,7 @@ router.get('/historical', ConvertController.getHistoricalRates());
 // Get current rate /:cryptoCurrency/:fiatCurrency
 router.get('/current', ConvertController.getCurrentRate());
 
+// coin market cap latest listings
+router.get('/coinmarketcap/listings/latest', ConvertController.getCoinCapLatestListings());
+
 module.exports = router;

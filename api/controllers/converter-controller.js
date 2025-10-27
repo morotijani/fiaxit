@@ -370,6 +370,104 @@ class ConvertController {
         }
     }
 
+    // coin cap get cryptocurrency lastest listing
+    getCoinCapLatestListings = () => {
+        const apiKey = process.env.REACT_APP_CMC_API_KEY;
+
+        return async (req, res, next) => {
+            try {
+                if (!apiKey) {
+                    return res.status(500).json({
+                        success: false,
+                        method: "getCoinCapLatestListings",
+                        message: "CoinMarketCap API key not configured."
+                    });
+                }
+
+                // Extract query parameters
+                const { start, limit, convert } = req.query;
+
+                const url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest';
+                const params = {
+                    start: start || '1',
+                    limit: limit || '10',
+                    convert: convert || 'USD'
+                };
+
+                // Use axios params and inspect status/data from axios response
+                const response = await axios.get(url, {
+                    headers: {
+                        'X-CMC_PRO_API_KEY': apiKey,
+                        'Accept': 'application/json'
+                    },
+                    params
+                });
+
+                if (!response || typeof response.status === 'undefined') {
+                    throw new Error('No response from CoinMarketCap');
+                }
+
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`CMC ${response.status} ${response.statusText || ''}`.trim());
+                }
+
+                const json = response.data;
+
+                const quoteCurrency = (params.convert || 'USD').toUpperCase();
+
+                const mapped = (json.data || []).map(a => {
+                    const quote = a.quote && a.quote[quoteCurrency] ? a.quote[quoteCurrency] : {};
+                    const price = Number(quote.price || 0);
+                    const change = Number(quote.percent_change_24h || 0);
+                    // coin icon from CoinMarketCap static CDN by id
+                    const icon = `https://s2.coinmarketcap.com/static/img/coins/64x64/${a.id}.png`;
+                    return {
+                        id: a.id,
+                        name: a.name,
+                        symbol: a.symbol,
+                        price,
+                        change,
+                        icon
+                    }
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    method: "getCoinCapLatestListings",
+                    data: mapped
+                });
+
+            } catch (error) {
+                console.error('Failed to load assets from CoinMarketCap', error);
+
+                // Handle specific API errors
+                if (error.response) {
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "getCoinCapLatestListings",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+                    // forward CMC status if present
+                    return res.status(error.response.status || 500).json({
+                        success: false,
+                        method: "getCoinCapLatestListings",
+                        message: error.response.statusText || 'CoinMarketCap error',
+                        details: error.response.data || error.message
+                    });
+                }
+
+                // Generic error response
+                return res.status(500).json({
+                    success: false,
+                    method: "getCoinCapLatestListings",
+                    message: "An error occurred while fetching CoinMarketCap listings.",
+                    details: error.message
+                });
+            }
+        }
+    }
 }
 
 module.exports = new ConvertController();
