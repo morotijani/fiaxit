@@ -14,14 +14,22 @@ const Wallet = mysql.define('fiaxit_wallets', {
         type: DataTypes.STRING(100),
         allowNull: false,
     },
+    wallet_name: {
+        type: DataTypes.STRING(150), 
+        allowNull: false
+    }, 
     wallet_for: {
         type: DataTypes.STRING(100),
         allowNull: false
     },
-    wallet_crypto: {
+    wallet_symbol: {
         type: DataTypes.STRING(100),
         allowNull: false
     },
+    wallet_crypto_name: {
+        type: DataTypes.STRING(150),
+        allowNull: false
+    }, 
     wallet_xpub: {
         type: DataTypes.STRING(300),
     }, 
@@ -56,7 +64,7 @@ const Wallet = mysql.define('fiaxit_wallets', {
     indexes: [
         {fields: ['wallet_id']},
         {fields: ['wallet_for']},
-        {fields: ['wallet_crypto']}, 
+        {fields: ['wallet_crypto_name']}, 
         {fields: ['createdAt']}, 
         {fields: ['wallet_status']}
     ],

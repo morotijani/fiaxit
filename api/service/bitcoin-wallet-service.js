@@ -402,11 +402,40 @@ class BitcoinWalletService {
 							return sum;
 						}, 0);
 					}
+
+					// convert amount from satoshis to BTC
+					amount = amount / 100000000;
+					// convert amount from BTC to USD (optional, requires external API for conversion)
+					// const amtCnvurl = `${process.env.API_BASE_URL}convert/bitcoin/usd/${amount}/crypto-to-fiat`;
+					// let fiatAmount = 0;
+					// try {
+					// 	const priceResponse = await axios.get(amtCnvurl);
+					// 	console.log(priceResponse);
+					// 	if (!priceResponse.success) {
+					// 		fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 		throw new Error("Failed to convert BTC to USD");
+					// 	}
+
+					// 	if (!priceResponse.data || !priceResponse.data.to || typeof priceResponse.data.to.amount !== 'number') {
+					// 		fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 		throw new Error("Invalid conversion data received");
+					// 	}
+
+					// 	const usdAmount = priceResponse.data.to.amount;
+					// 	fiatAmount = usdAmount;
+					// } catch (error) {
+					// 	fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 	console.error("Error converting BTC to USD:", error.message);
+					// }
+
+					// Format transaction details
+
 					
 					return {
 						txid: tx.hash, 
 						type, 
-						amount: amount / 100000000, // Convert satoshis to BTC
+						amount,
+						// fiatAmount,
 						fee: tx.fees / 100000000, 
 						confirmations: tx.confirmations || 0, 
 						blockHeight: tx.block_height || null, 

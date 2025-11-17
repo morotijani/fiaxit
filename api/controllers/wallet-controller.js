@@ -90,6 +90,7 @@ class WalletsController {
                         walletAddress = wallet.address
                         walletPrivatekey = wallet.privateKey // For development only
                         walletMnemonic = wallet.mnemonic; // For development only
+                        walletCryptoName = 'Bitcoin';
                         
                         // For development only - log sensitive data (REMOVE IN PRODUCTION)
                         // if (process.env.NODE_ENV !== 'production') {
@@ -111,6 +112,7 @@ class WalletsController {
                         walletAddress = wallet.address
                         walletPrivatekey = wallet.privateKey
                         walletMnemonic = wallet.mnemonic
+                        walletCryptoName = 'Tether USD';
                         
                         console.log("USDT Wallet generated:", wallet);
                     } catch (error) {
@@ -140,6 +142,7 @@ class WalletsController {
                         walletAddress = wallet.address;
                         walletPrivatekey = wallet.privateKey;
                         walletMnemonic = wallet.mnemonic;
+                        walletCryptoName = 'Ethereum';
                         
                         console.log("Generated ETH wallet:", wallet);
                     } catch (error) {
@@ -162,7 +165,8 @@ class WalletsController {
                 const wallet = await Wallet.create({
                     wallet_id: walletId, 
                     wallet_for: userId, 
-                    wallet_crypto: crypto, 
+                    wallet_symbol: crypto, 
+                    wallet_crypto_name: walletCryptoName,
                     wallet_xpub: walletXpub, 
                     wallet_address: walletAddress, 
                     wallet_privatekey: walletPrivatekey,

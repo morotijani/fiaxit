@@ -181,7 +181,7 @@ class EthereumWalletService {
 						const balanceWei = await this.provider.getBalance(address);
 						const balanceEth = ethers.formatEther(balanceWei);
 
-						res.status(200).json({
+						return res.status(200).json({
 							success: true, 
 							method: "getETHWalletBalance", 
 							message: `Successfully viewed Ethereum wallet balance for ${address}`, 
@@ -203,14 +203,14 @@ class EthereumWalletService {
 				}
 		
 				console.error("Ethereum Wallet balance error:", lastError);
-				res.status(422).json({
+				return res.status(422).json({
 					success: false, 
 					method: "getETHWalletBalance", 
 					error: lastError || "Failed to get balance after multiple attempts."
 				});
 			} catch (error) {
 				console.error("Error getting Ethereum wallet balance:", error);
-				res.status(500).json({
+				return res.status(500).json({
 					success: false, 
 					method: "getETHWalletBalance", 
 					error: "An error occurred while fetching wallet balance.", 
@@ -302,13 +302,13 @@ class EthereumWalletService {
 							}));
 						}
 					} else {
-					console.warn("Etherscan API key not provided. Transaction history unavailable.");
+						console.warn("Etherscan API key not provided. Transaction history unavailable.");
 					}
 				} catch (error) {
 					console.error("Error fetching transaction history:", error);
 				}
 
-				res.status(200).json({
+				return res.status(200).json({
 					success: true, 
 					method: "getETHWalletInfo", 
 					message: `Successfully listed Ethereum wallet info for ${address}`, 
@@ -318,7 +318,7 @@ class EthereumWalletService {
 						balance: {
 							wei: balanceInfo.balanceWei, 
 							ether: balanceInfo.balanceEth
-						},
+						}, 
 						transactionCount, 
 						transactions, 
 						lastUpdated: new Date().toISOString() 
@@ -326,12 +326,12 @@ class EthereumWalletService {
 				});
 			} catch (error) {
 				console.error("Error getting Ethereum wallet info:", error);
-				return {
+				return res.status(500).json({
 					success: false, 
 					method: "getETHWalletInfo", 
 					error: "Failed to get Ethereum wallet info", 
 					details: error.message
-				};
+				});
 			}
 		}
   	}
@@ -787,9 +787,30 @@ class EthereumWalletService {
    		* Get list of supported networks
    		* @returns {string[]} List of supported network names
    */
-  	getSupportedNetworks() {
-    	return Object.keys(this.networks);
-  	}
+	getSupportedNetworks() {
+		return Object.keys(this.networks);
+	}
+
+	/**
+	 * Helper function to map and format transaction fields
+	 * @param {Array} txList - Array of raw transaction objects
+	 * @returns {Array} Array of formatted transaction objects
+	 */
+	mapAndFormatTransactions(txList) {
+		if (!Array.isArray(txList)) return [];
+		return txList.map(tx => ({
+			hash: tx.hash,
+			from: tx.from,
+			to: tx.to,
+			value: ethers.formatEther(BigInt(tx.value)),
+			gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'),
+			gasUsed: tx.gasUsed,
+			blockNumber: tx.blockNumber,
+			timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
+			isError: tx.isError === '1',
+			confirmations: tx.confirmations
+		}));
+	}
 }
 
 module.exports = new EthereumWalletService();

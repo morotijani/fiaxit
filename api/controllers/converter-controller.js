@@ -97,6 +97,25 @@ class ConvertController {
                 
             } catch(error) {
                 console.error('Error in currency conversion:', error);
+                if (error.response) {
+                    // The request was made and the server responded with a status code
+                    // that falls out of the range of 2xx
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "convertCurrency",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+
+                    return res.status(error.response.status).json({
+                        success: false,
+                        method: "convertCurrency",
+                        message: "An error occurred during currency conversion.",
+                        details: error.response.data
+                    });
+                }
+                
                 return res.status(500).json({
                     success: false,
                     method: "convertCurrency",
@@ -463,6 +482,274 @@ class ConvertController {
                     success: false,
                     method: "getCoinCapLatestListings",
                     message: "An error occurred while fetching CoinMarketCap listings.",
+                    details: error.message
+                });
+            }
+        }
+    }
+
+    // get coin info using symbol
+    getCoinLatestInfoBySymbol = () => {
+        const apiKey = process.env.REACT_APP_CMC_API_KEY;
+
+        return async (req, res, next) => {
+            try {
+                if (!apiKey) {
+                    return res.status(500).json({
+                        success: false,
+                        method: "getCoinCapLatestListings",
+                        message: "CoinMarketCap API key not configured."
+                    });
+                }
+
+                // Extract symbol parameter
+                const { symbol } = req.params;
+                if (!symbol) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "getCoinLatestInfoBySymbol",
+                        message: "Missing required parameter: symbol."
+                    });
+                }
+
+                // const url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/info';
+                const url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest';
+                const params = {
+                    symbol: symbol.toUpperCase()
+                };
+                const response = await axios.get(url, {
+                    headers: {
+                        'X-CMC_PRO_API_KEY': apiKey, 
+                        'Accept': 'application/json'
+                    },
+                    params
+                });
+
+                if (!response || typeof response.status === 'undefined') {
+                    throw new Error('No response from CoinMarketCap');
+                }
+
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`CMC ${response.status} ${response.statusText || ''}`.trim());
+                }
+
+                const json = response.data;
+                const coinData = json.data && json.data[params.symbol] ? json.data[params.symbol] : null;
+                if (!coinData) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "getCoinLatestInfoBySymbol",
+                        message: `Cryptocurrency with symbol '${symbol}' not found.`
+                    });
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    method: "getCoinLatestInfoBySymbol",
+                    data: coinData
+                });
+            } catch (error) {
+                console.error('Failed to load coin details from CoinMarketCap', error);
+                if (error.response) {
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "getCoinLatestInfoBySymbol",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+
+                    return res.status(error.response.status || 500).json({
+                        success: false,
+                        method: "getCoinLatestInfoBySymbol",
+                        message: error.response.statusText || 'CoinMarketCap error',
+                        details: error.response.data || error.message
+                    });
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    method: "getCoinLatestInfoBySymbol",
+                    message: "An error occurred while fetching coin details.",
+                    details: error.message
+                });
+            }
+        }
+    }
+
+    // get single coin details
+    getSingleCoinDetails = () => {
+        const apiKey = process.env.REACT_APP_CMC_API_KEY;
+
+        return async (req, res, next) => {
+            try {
+                if (!apiKey) {
+                    return res.status(500).json({
+                        success: false,
+                        method: "getCoinCapLatestListings",
+                        message: "CoinMarketCap API key not configured."
+                    });
+                }
+
+                // Extract id, currency parameter
+                const { id, convert } = req.params;
+                if (!id) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "getSingleCoinDetails",
+                        message: "Missing required parameter: id."
+                    });
+                }
+
+                const url = 'https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest';
+                const params = {
+                    id: id, 
+                    convert: convert || 'USD'
+                };
+                const response = await axios.get(url, {
+                    headers: {
+                        'X-CMC_PRO_API_KEY': apiKey, 
+                        'Accept': 'application/json'
+                    },
+                    params
+                });
+
+                if (!response || typeof response.status === 'undefined') {
+                    throw new Error('No response from CoinMarketCap');
+                }
+
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`CMC ${response.status} ${response.statusText || ''}`.trim());
+                }
+
+                const json = response.data;
+                const coinData = json.data && json.data[params.id] ? json.data[params.id] : null;
+                if (!coinData) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "getSingleCoinDetails",
+                        message: `Cryptocurrency with id '${id}' not found.`
+                    });
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    method: "getSingleCoinDetails",
+                    data: coinData
+                });
+            } catch (error) {
+                console.error('Failed to load coin details from CoinMarketCap', error);
+                if (error.response) {
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "getSingleCoinDetails",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+
+                    return res.status(error.response.status || 500).json({
+                        success: false,
+                        method: "getSingleCoinDetails",
+                        message: error.response.statusText || 'CoinMarketCap error',
+                        details: error.response.data || error.message
+                    });
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    method: "getSingleCoinDetails",
+                    message: "An error occurred while fetching coin details.",
+                    details: error.message
+                });
+            }
+        }
+    }
+
+    // get coin statistics by id and range
+    getCoinStatisticsByIdAndRange = () => {
+        const apiKey = process.env.COINSTATS_API_KEY;
+
+        return async (req, res, next) => {
+            try {
+                if (!apiKey) {
+                    return res.status(500).json({
+                        success: false,
+                        method: "getCoinStatisticsByIdAndRange",
+                        message: "Coinstats API key not configured."
+                    });
+                }
+
+                // Extract id, currency parameter
+                const { period, id } = req.params;
+                if (!id) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "getCoinStatisticsByIdAndRange",
+                        message: "Missing required parameter: id."
+                    });
+                }
+
+               const url = `https://openapiv1.coinstats.app/coins/${id}/charts`;
+                const params = {
+                    period: period || '1m'
+                };
+                const response = await axios.get(url, {
+                    headers: {
+                        'X-API-KEY': apiKey, 
+                        'Accept': 'application/json'
+                    },
+                    params
+                });
+
+                if (!response || typeof response.status === 'undefined') {
+                    throw new Error('No response from CoinStats');
+                }
+
+                if (response.status < 200 || response.status >= 300) {
+                    throw new Error(`CoinStats ${response.status} ${response.statusText || ''}`.trim());
+                }
+
+                const json = response.data;
+                const coinData = json ? json : null;
+                if (!coinData) {
+                    console.error('CoinStats response missing chart data', json);
+                    return res.status(404).json({
+                        success: false,
+                        method: "getCoinStatisticsByIdAndRange",
+                        message: `Cryptocurrency with id '${id}' not found.`
+                    });
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    method: "getCoinStatisticsByIdAndRange",
+                    data: coinData, 
+                    timestamp: new Date()
+                });
+            } catch (error) {
+                console.error('Failed to load coin statistics from CoinStats', error);
+                  if (error.response) {
+                    if (error.response.status === 429) {
+                        return res.status(429).json({
+                            success: false,
+                            method: "getCoinStatisticsByIdAndRange",
+                            message: "Rate limit exceeded. Please try again later."
+                        });
+                    }
+
+                    return res.status(error.response.status || 500).json({
+                        success: false,
+                        method: "getCoinStatisticsByIdAndRange",
+                        message: error.response.statusText || 'CoinStats error',
+                        details: error.response.data || error.message
+                    });
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    method: "getCoinStatisticsByIdAndRange",
+                    message: "An error occurred while fetching coin statistics.",
                     details: error.message
                 });
             }
