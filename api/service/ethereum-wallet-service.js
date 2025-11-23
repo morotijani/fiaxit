@@ -246,66 +246,194 @@ class EthereumWalletService {
 					})
 				}
 
-				// Get current network
 				const network = this.currentNetwork;
 				const etherscanApi = this.networks[network].etherscanApi;
 
 				// Get balance with retry logic
-				let balanceInfo;
-				try {
-					balanceInfo = await this.getWalletBalance(address);
-				} catch (error) {
-					console.error("Error getting balance:", error);
-					balanceInfo = { balanceWei: "0", balanceEth: "0" };
+				let balanceWei = null;
+				let balanceEth = "0";
+				let attempts = 0;
+				const maxAttempts = 3;
+				let lastBalanceError = null;
+				while (attempts < maxAttempts) {
+					try {
+						balanceWei = await this.provider.getBalance(address);
+						balanceEth = ethers.formatEther(balanceWei);
+						break;
+					} catch (err) {
+						lastBalanceError = err;
+						attempts++;
+						if (attempts < maxAttempts) {
+							await new Promise(r => setTimeout(r, 500 * attempts));
+						}
+					}
+				}
+				if (balanceWei === null) {
+					console.error("Error getting balance after retries:", lastBalanceError);
+					return res.status(422).json({
+						success: false,
+						method: "getETHWalletInfo",
+						error: "Failed to fetch balance after multiple attempts.",
+						details: lastBalanceError ? lastBalanceError.message : null
+					});
 				}
 
 				// Get transaction count (nonce) with retry
 				let transactionCount = 0;
-				try {
-					transactionCount = await this.provider.getTransactionCount(address);
-				} catch (error) {
-					console.error("Error getting transaction count:", error);
+				attempts = 0;
+				let lastCountError = null;
+				while (attempts < maxAttempts) {
+					try {
+						transactionCount = await this.provider.getTransactionCount(address);
+						break;
+					} catch (err) {
+						lastCountError = err;
+						attempts++;
+						if (attempts < maxAttempts) {
+							await new Promise(r => setTimeout(r, 500 * attempts));
+						}
+					}
+				}
+				if (transactionCount === undefined) {
+					console.error("Error getting transaction count:", lastCountError);
+					transactionCount = 0;
 				}
 
-				// Get transactions from Etherscan API
+				// Get transactions from Etherscan API (try normal, then internal, then token txs)
 				let transactions = [];
 				try {
-					if (this.etherscanApiKey) {
-						const transactionsResponse = await axios.get(etherscanApi, {
-							params: {
-								module: 'account', 
-								action: 'txlist', 
-								address: address, 
-								startblock: 0, 
-								endblock: 99999999, 
-								page: 1, 
-								offset: 10, // Get last 10 transactions
-								sort: 'desc', 
-								apikey: this.etherscanApiKey
-							}, 
-							timeout: 5000 // 5 second timeout
-						});
+					let etherscanFailed = false;
+					let combinedTxs = [];
 
-						// Format transactions
-						if (transactionsResponse.data && transactionsResponse.data.status === '1') {
-							transactions = transactionsResponse.data.result.map(tx => ({
-								hash: tx.hash, 
-								from: tx.from, 
-								to: tx.to, 
-								value: ethers.formatEther(tx.value), 
-								gasPrice: ethers.formatUnits(tx.gasPrice, 'gwei'), 
-								gasUsed: tx.gasUsed, 
-								blockNumber: tx.blockNumber, 
-								timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(), 
-								isError: tx.isError === '1', 
-								confirmations: tx.confirmations
-							}));
+					if (this.etherscanApiKey && etherscanApi) {
+						// Try normal txs
+						const txlistResp = await axios.get(etherscanApi, {
+							params: {
+								module: 'account',
+								action: 'txlist',
+								address: address,
+								startblock: 0,
+								endblock: 99999999,
+								page: 1,
+								offset: 100, // fetch up to 100 txs
+								sort: 'desc',
+								apikey: this.etherscanApiKey
+							},
+							timeout: 8000
+						});
+						const d = txlistResp.data;
+						if (d && d.status === '1' && Array.isArray(d.result) && d.result.length > 0) {
+							combinedTxs = d.result;
+						} else {
+							// Try internal txs
+							const internalResp = await axios.get(etherscanApi, {
+								params: {
+									module: 'account',
+									action: 'txlistinternal',
+									address,
+									startblock: 0,
+									endblock: 99999999,
+									page: 1,
+									offset: 100,
+									sort: 'desc',
+									apikey: this.etherscanApiKey
+								},
+								timeout: 8000
+							});
+							if (internalResp.data && Array.isArray(internalResp.data.result)) {
+								combinedTxs = combinedTxs.concat(internalResp.data.result);
+							}
+							// Try token txs
+							const tokenResp = await axios.get(etherscanApi, {
+								params: {
+									module: 'account',
+									action: 'tokentx',
+									address,
+									startblock: 0,
+									endblock: 99999999,
+									page: 1,
+									offset: 100,
+									sort: 'desc',
+									apikey: this.etherscanApiKey
+								},
+								timeout: 8000
+							});
+							if (tokenResp.data && Array.isArray(tokenResp.data.result)) {
+								combinedTxs = combinedTxs.concat(tokenResp.data.result.map(tx => ({
+									...tx,
+									value: tx.value || "0",
+									timeStamp: tx.timeStamp,
+									gasPrice: tx.gasPrice || "0",
+									gasUsed: tx.gasUsed || "0",
+									blockNumber: tx.blockNumber,
+									isError: '0',
+									confirmations: tx.confirmations || null
+								})));
+							}
+							if (combinedTxs.length === 0) etherscanFailed = true;
 						}
+						// Deduplicate by hash
+						const seen = new Set();
+						const deduped = [];
+						for (const tx of combinedTxs) {
+							const hash = tx.hash || tx.transactionHash;
+							if (hash && !seen.has(hash)) {
+								seen.add(hash);
+								deduped.push(tx);
+							}
+						}
+						transactions = this.mapAndFormatTransactions(deduped)
+							.sort((a, b) => Number(b.blockNumber || 0) - Number(a.blockNumber || 0))
+							.slice(0, 20);
 					} else {
-						console.warn("Etherscan API key not provided. Transaction history unavailable.");
+						console.warn("Etherscan API key not provided. Will attempt RPC fallback (Alchemy) if available.");
+						etherscanFailed = true;
+					}
+
+					// Fallback to Alchemy RPC (alchemy_getAssetTransfers)
+					if (etherscanFailed) {
+						const rpcUrl = (this.networks[this.currentNetwork] && this.networks[this.currentNetwork].rpcUrl) || '';
+						const looksLikeAlchemy = rpcUrl.includes('alchemy') || rpcUrl.includes('alchemyapi');
+						if (looksLikeAlchemy && this.provider && typeof this.provider.send === 'function') {
+							try {
+								const params = [{
+									fromBlock: '0x0',
+									toBlock: 'latest',
+									fromAddress: address,
+									toAddress: address,
+									category: ['external', 'erc20', 'erc721', 'erc1155'],
+									maxCount: '0x64'
+								}];
+								const alchemyResult = await this.provider.send('alchemy_getAssetTransfers', params);
+								const list = alchemyResult.transfers || alchemyResult.result || [];
+								const mapped = list.map(t => {
+									const hash = t.hash || t.transactionHash || null;
+									const from = t.from || null;
+									const to = t.to || null;
+									const blockNumber = t.blockNum || t.blockNumber || null;
+									const ts = (t.metadata && t.metadata.blockTimestamp) || t.blockTimestamp || t.timestamp || null;
+									let timestamp = null;
+									try { if (ts) timestamp = new Date(ts).toISOString(); } catch (e) {}
+									let value = "0";
+									try {
+										if (t.value !== undefined && t.value !== null && t.value !== "") {
+											value = ethers.formatEther(t.value.toString());
+										} else if (t.rawContract && t.rawContract.value) {
+											value = ethers.formatEther(t.rawContract.value.toString());
+										}
+									} catch (e) { value = "0"; }
+									return { hash, from, to, value, gasPrice: null, gasUsed: null, blockNumber, timestamp, isError: false, confirmations: null };
+								});
+								transactions = mapped.sort((a,b) => (Number(b.blockNumber || 0) - Number(a.blockNumber || 0))).slice(0,20);
+							} catch (alchemyErr) {
+								console.warn("Alchemy fallback failed:", alchemyErr && alchemyErr.message);
+								transactions = [];
+							}
+						}
 					}
 				} catch (error) {
 					console.error("Error fetching transaction history:", error);
+					transactions = [];
 				}
 
 				return res.status(200).json({
@@ -316,11 +444,11 @@ class EthereumWalletService {
 						address, 
 						network, 
 						balance: {
-							wei: balanceInfo.balanceWei, 
-							ether: balanceInfo.balanceEth
+							wei: balanceWei.toString(), 
+							ether: balanceEth
 						}, 
 						transactionCount, 
-						transactions, 
+						transactions: Array.isArray(transactions) ? transactions : [],
 						lastUpdated: new Date().toISOString() 
 					}
 				});

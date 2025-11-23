@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid')
 const USDTService = require('../service/usdt-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
+const ethers = require('ethers'); // added
 
 class WalletsController {
 
@@ -13,7 +14,8 @@ class WalletsController {
                 const userId = req.userData.user_id;
                 const { count, rows } = await Wallet.findAndCountAll({
                     where: {
-                        wallet_for: userId
+                        wallet_for: userId, 
+                        wallet_status: 0 // only active wallets
                     },
                     order: [['createdAt', 'DESC']]
                 });
@@ -353,6 +355,146 @@ class WalletsController {
                     success: false,
                     error: "Something went wrong, please try again.", 
                     details: err.message || "An error occurred during transaction deletion."
+                });
+            }
+        }
+    }
+
+    // get all wallet balance by using getAll function to loop through each wallet address and get their balance ad sum them together as one 
+    getTotalBalance = () => {
+        return async (req, res, next) => {
+            // helper: call middleware-style getWalletBalance and capture JSON response
+            const callMiddleware = async (service, address) => {
+                try {
+                    if (!service || typeof service.getWalletBalance !== 'function') return null;
+                    const mw = service.getWalletBalance();
+                    return await new Promise((resolve) => {
+                        const reqMock = { params: { address } };
+                        const resMock = {
+                            _status: 200,
+                            status(code) { this._status = code; return this; },
+                            json(payload) { resolve({ status: this._status || 200, payload }); }
+                        };
+                        try {
+                            const maybe = mw(reqMock, resMock);
+                            if (maybe && typeof maybe.then === 'function') {
+                                // middleware is async; it will resolve via resMock.json
+                            }
+                        } catch (e) {
+                            resolve({ status: 500, error: e });
+                        }
+                    });
+                } catch (err) {
+                    return { status: 500, error: err };
+                }
+            };
+
+            try {
+                const userId = req.userData.user_id;
+                const wallets = await Wallet.findAll({
+                    where: {
+                        wallet_for: userId,
+                        wallet_status: 0 // only active wallets
+                    }
+                });
+
+                const totals = {};
+
+                for (const wallet of wallets) {
+                    const symbol = wallet.wallet_symbol;
+                    const address = wallet.wallet_address;
+                    let numeric = 0;
+
+                    try {
+                        if (!address) {
+                            console.warn(`Skipping wallet with no address (symbol=${symbol})`);
+                            continue;
+                        }
+
+                        // ETH: prefer direct provider.getBalance
+                        if (symbol === 'ETH') {
+                            try {
+                                if (EthereumWalletService && EthereumWalletService.provider && typeof EthereumWalletService.provider.getBalance === 'function') {
+                                    const bal = await EthereumWalletService.provider.getBalance(address);
+                                    numeric = parseFloat(ethers.formatEther(bal)) || 0;
+                                } else {
+                                    const resp = await callMiddleware(EthereumWalletService, address);
+                                    const data = resp && resp.payload && resp.payload.data;
+                                    numeric = parseFloat(data?.balanceEth ?? data?.eth?.balance ?? data?.balance ?? 0) || 0;
+                                }
+                            } catch (e) {
+                                console.warn(`ETH balance fetch failed for ${address}:`, e.message);
+                                const resp = await callMiddleware(EthereumWalletService, address);
+                                const data = resp && resp.payload && resp.payload.data;
+                                numeric = parseFloat(data?.balanceEth ?? data?.eth?.balance ?? 0) || 0;
+                            }
+                        }
+
+                        // USDT: call USDT service middleware (or direct func if implemented)
+                        else if (symbol === 'USDT') {
+                            let resp;
+                            try {
+                                // Some services expose direct function; attempt it first
+                                if (typeof USDTService.getWalletBalance === 'function' && USDTService.getWalletBalance.length === 0) {
+                                    // if it's middleware-style, call via helper
+                                    resp = await callMiddleware(USDTService, address);
+                                } else {
+                                    resp = await callMiddleware(USDTService, address);
+                                }
+                            } catch (e) {
+                                resp = await callMiddleware(USDTService, address);
+                            }
+                            const data = resp && resp.payload && resp.payload.data;
+                            const flat = resp && resp.payload ? resp.payload : resp;
+                            numeric = parseFloat(data?.usdt?.balance ?? flat?.data?.usdt?.balance ?? flat?.data?.balance ?? 0) || 0;
+                        }
+
+                        // BTC: call Bitcoin middleware
+                        else if (symbol === 'BTC') {
+                            let resp;
+                            try {
+                                resp = await callMiddleware(BitcoinWalletService, address);
+                            } catch (e) {
+                                resp = await callMiddleware(BitcoinWalletService, address);
+                            }
+                            const data = resp && resp.payload && resp.payload.data;
+                            const flat = resp && resp.payload ? resp.payload : resp;
+                            // Bitcoin returns btc under data.balance.btc or data.balance.btc string
+                            numeric = parseFloat(data?.balance?.btc ?? flat?.data?.balance?.btc ?? flat?.data?.balance ?? 0) || 0;
+                        }
+
+                        // Fallback: try all services' middleware to find any numeric field
+                        else {
+                            const resp = await callMiddleware(EthereumWalletService, address) || await callMiddleware(USDTService, address) || await callMiddleware(BitcoinWalletService, address);
+                            const data = resp && resp.payload && resp.payload.data;
+                            numeric = parseFloat(data?.balance ?? data?.balanceEth ?? data?.usdt?.balance ?? 0) || 0;
+                        }
+                    } catch (innerErr) {
+                        console.error(`Error fetching balance for ${symbol} ${address}:`, innerErr && innerErr.message);
+                        numeric = 0;
+                    }
+                    
+                    if (!totals[symbol]) {
+                        totals[symbol] = {};
+                    }
+                    
+                    totals[symbol]['amount'] = (totals[symbol]['amount'] || 0) + numeric;
+                    totals[symbol]['name'] = wallet.wallet_crypto_name || null;
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    method: "getTotalBalance",
+                    message: "Successfully fetched all wallet balances.",
+                    data: totals
+                });
+            } catch (err) {
+                console.error("Error fetching wallets:", err);
+                return res.status(500).json({
+                    success: false,
+                    method: "getTotalBalance",
+                    error: "Failed to fetch wallets.",
+                    details: err.message || "An error occurred while fetching wallets."
                 });
             }
         }

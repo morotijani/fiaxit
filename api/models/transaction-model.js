@@ -26,6 +26,11 @@ const Transaction = mysql.define('fiaxit_transactions', {
         type: DataTypes.DECIMAL(15, 8), // DECIMAL is better for financial data than DOUBLE
         allowNull: false
     },
+    transaction_type: {
+        type: DataTypes.ENUM('send', 'receive'),
+        defaultValue: null,
+        allowNull: true
+    },
     transaction_crypto_id: {
         type: DataTypes.STRING(255),
         allowNull: true // Explicitly mark as nullable
@@ -55,11 +60,11 @@ const Transaction = mysql.define('fiaxit_transactions', {
         allowNull: true
     }, 
     transaction_status: {
-        type: DataTypes.TINYINT(1), // Use TINYINT(1) for boolean-like fields
-        defaultValue: 0,
+        type: DataTypes.ENUM('Completed', 'Pending', 'Failed', 'Cancelled'), // Use TINYINT(1) for boolean-like fields
+        defaultValue: 'Pending',
         allowNull: false,
         validate: {
-            isIn: [[0, 1, 2, 3]] // Add validation for allowed status values
+            isIn: [['Completed', 'Pending', 'Failed', 'Cancelled']] // Add validation for allowed status values
         }
     },
     createdAt: {

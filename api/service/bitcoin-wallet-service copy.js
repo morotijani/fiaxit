@@ -341,98 +341,116 @@ class BitcoinWalletService {
 				
 				const network = isTestnet ? 'testnet' : 'mainnet';
 				const apiUrl = `${this.apiEndpoints[network]}/addrs/${address}`;
-				const maxAttempts = 3;
-				let data = {};
-				let txsData = {};
-				let lastError = null;
-
-				// Retry logic for address info
-				for (let attempt = 0; attempt < maxAttempts; attempt++) {
-					try {
-						const response = await axios.get(apiUrl, { timeout: 7000 });
-						data = response.data || {};
-						break;
-					} catch (err) {
-						lastError = err;
-						if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-					}
-				}
-
-				// Retry logic for transactions
-				for (let attempt = 0; attempt < maxAttempts; attempt++) {
-					try {
-						const txsUrl = `${apiUrl}/full?limit=20`;
-						const txsResponse = await axios.get(txsUrl, { timeout: 7000 });
-						txsData = txsResponse.data || {};
-						break;
-					} catch (err) {
-						lastError = err;
-						if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-					}
-				}
-
-				// Defensive checks and formatting
-				const transactions = Array.isArray(txsData.txs) ? txsData.txs.map(tx => {
+				
+				// Fetch address information from BlockCypher API
+				const response = await axios.get(apiUrl);
+				const data = response.data;
+				
+				// Fetch recent transactions
+				const txsUrl = `${apiUrl}/full?limit=10`;
+				const txsResponse = await axios.get(txsUrl);
+				const txsData = txsResponse.data;
+				
+				// Format transactions
+				const transactions = txsData.txs ? txsData.txs.map(tx => {
+					// Calculate if this transaction is sending or receiving for this address
 					let type = 'unknown';
 					let amount = 0;
-
-					const isInput = Array.isArray(tx.inputs) && tx.inputs.some(input => 
-						Array.isArray(input.addresses) && input.addresses.includes(address)
+					
+					// Check inputs (sending)
+					const isInput = tx.inputs.some(input => 
+						input.addresses && input.addresses.includes(address)
 					);
-
-					const isOutput = Array.isArray(tx.outputs) && tx.outputs.some(output => 
-						Array.isArray(output.addresses) && output.addresses.includes(address)
+					
+					// Check outputs (receiving)
+					const isOutput = tx.outputs.some(output => 
+						output.addresses && output.addresses.includes(address)
 					);
-
+					
 					if (isInput && isOutput) {
 						type = 'self';
+						
+						// Calculate the change amount
 						const totalOut = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && !output.addresses.includes(address)) {
-								return sum + (output.value || 0);
+							if (output.addresses && !output.addresses.includes(address)) {
+								return sum + output.value;
 							}
 							return sum;
 						}, 0);
+						
 						amount = -totalOut;
 					} else if (isInput) {
 						type = 'sent';
+						
+						// Calculate the sent amount (excluding change)
 						const totalOut = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && !output.addresses.includes(address)) {
-								return sum + (output.value || 0);
+							if (output.addresses && !output.addresses.includes(address)) {
+								return sum + output.value;
 							}
 							return sum;
 						}, 0);
+						
 						amount = -totalOut;
 					} else if (isOutput) {
 						type = 'received';
+						
+						// Calculate the received amount
 						amount = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && output.addresses.includes(address)) {
-								return sum + (output.value || 0);
+							if (output.addresses && output.addresses.includes(address)) {
+								return sum + output.value;
 							}
 							return sum;
 						}, 0);
 					}
 
+					// convert amount from satoshis to BTC
 					amount = amount / 100000000;
+					// convert amount from BTC to USD (optional, requires external API for conversion)
+					// const amtCnvurl = `${process.env.API_BASE_URL}convert/bitcoin/usd/${amount}/crypto-to-fiat`;
+					// let fiatAmount = 0;
+					// try {
+					// 	const priceResponse = await axios.get(amtCnvurl);
+					// 	console.log(priceResponse);
+					// 	if (!priceResponse.success) {
+					// 		fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 		throw new Error("Failed to convert BTC to USD");
+					// 	}
 
+					// 	if (!priceResponse.data || !priceResponse.data.to || typeof priceResponse.data.to.amount !== 'number') {
+					// 		fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 		throw new Error("Invalid conversion data received");
+					// 	}
+
+					// 	const usdAmount = priceResponse.data.to.amount;
+					// 	fiatAmount = usdAmount;
+					// } catch (error) {
+					// 	fiatAmount = amount; // fallback to BTC amount if conversion fails
+					// 	console.error("Error converting BTC to USD:", error.message);
+					// }
+
+					// Format transaction details
+
+					
 					return {
-						txid: tx.hash || "",
-						type,
+						txid: tx.hash, 
+						type, 
 						amount,
-						fee: tx.fees ? tx.fees / 100000000 : 0,
-						confirmations: tx.confirmations || 0,
-						blockHeight: tx.block_height || null,
-						timestamp: tx.received ? new Date(tx.received).toISOString() : null,
-						inputs: Array.isArray(tx.inputs) ? tx.inputs.map(input => ({
-							addresses: input.addresses || [],
+						// fiatAmount,
+						fee: tx.fees / 100000000, 
+						confirmations: tx.confirmations || 0, 
+						blockHeight: tx.block_height || null, 
+						timestamp: tx.received ? new Date(tx.received).toISOString() : null, 
+						inputs: tx.inputs.map(input => ({
+							addresses: input.addresses || [], 
 							value: input.output_value ? input.output_value / 100000000 : 0
-						})) : [],
-						outputs: Array.isArray(tx.outputs) ? tx.outputs.map(output => ({
-							addresses: output.addresses || [],
+						})), 
+						outputs: tx.outputs.map(output => ({
+							addresses: output.addresses || [], 
 							value: output.value ? output.value / 100000000 : 0
-						})) : []
+						}))
 					};
 				}) : [];
-
+				
 				res.status(200).json({
 					success: true, 
 					method: "getBitcoinWalletInfo", 
@@ -441,23 +459,23 @@ class BitcoinWalletService {
 						address, 
 						network, 
 						balance: {
-							confirmed: (data.balance || 0) / 100000000,
-							unconfirmed: (data.unconfirmed_balance || 0) / 100000000,
-							total: ((data.balance || 0) + (data.unconfirmed_balance || 0)) / 100000000
+							confirmed: data.balance / 100000000, // Convert satoshis to BTC
+							unconfirmed: data.unconfirmed_balance / 100000000, 
+							total: (data.balance + data.unconfirmed_balance) / 100000000
 						}, 
-						transactions,
-						txCount: data.n_tx || 0,
-						totalReceived: (data.total_received || 0) / 100000000,
-						totalSent: (data.total_sent || 0) / 100000000,
-						lastUpdated: new Date().toISOString()
+						transactions, 
+						txCount: data.n_tx, 
+						totalReceived: data.total_received / 100000000, 
+						totalSent: data.total_sent / 100000000, 
+						lastUpdated: new Date().toISOString() 
 					}
 				});
 			} catch (error) {
 				console.error("Error getting Bitcoin wallet info:", error);
-			 res.status(422).json({
+				res.status(422).json({
 					success: false, 
 					method: "getBitcoinWalletInfo", 
-					error: "Failed to get Bitcoin wallet info.", 
+					error: "Failed to Bitcoin get wallet info.", 
 					details: error.message || "An error occurred while fetching Bitcoin wallet balance."
 				});
 			}

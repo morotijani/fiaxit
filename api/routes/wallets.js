@@ -32,6 +32,9 @@ router.get('/eth/:address/info', EthereumWalletService.getWalletInfo()); // get 
 router.get('/eth/:address/validate', WalletsController.validateETHAddress); // validate eth address
 
 
+// get total balance
+router.get('/balance', WalletsController.getTotalBalance()); // get total balance of all wallets
+
 // Usage (example): GET /api/v1/wallets
 router.get('/', WalletsController.getAll()) // get all wallet address
 
