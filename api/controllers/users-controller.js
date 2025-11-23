@@ -61,11 +61,11 @@ class UsersController {
 
                 if (isEmailExist) {
                     return res.status(401).json({
-                    success: false, 
-                    method: "registerUser", 
-                    path: "email", 
-                    message: "User registration failed: Email already exist."
-                })
+                        success: false, 
+                        method: "registerUser", 
+                        path: "email", 
+                        message: "User registration failed: Email already exist."
+                    })
                 }
 
                 // check for password length and characters
@@ -132,9 +132,9 @@ class UsersController {
                     html: `
                         <h3>${req.body.fname},</h3>
                         <p>Thank you for registering with Fiaxit 👻. 
-                        <br>Please click on the following link to verify your account: <a href="http://sites.local:6000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:6000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
+                        <br>Please click on the following link to verify your account: <a href="http://sites.local:8000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:6000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
                         <br>
-                        http://sites.local:6000/v1/auth/verify/${userId}/${vericode}
+                        http://sites.local:8000/v1/auth/verify/${userId}/${vericode}
                         <br>
                         <br>
                         With love,

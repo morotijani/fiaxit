@@ -70,20 +70,6 @@ class TransactionsController {
         return async (req, res, next) => {
             try {
                 const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
-                
-                // validate required fields
-                const requiredFields = ['amount', 'crypto_id', 'receiverAddress', 'senderPrivateKey'];
-                for (const field of requiredFields) {
-                    if (!req.body[field]) {
-                        return res.status(400).json({
-                            success: false, 
-                            method: "createAndSend" + cryptoSymbol, 
-                            error: `Missing required field: ${field}`
-                        });
-                    }
-                }
-
-                let result;
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
                 const transactionStatus = 1;
@@ -92,7 +78,21 @@ class TransactionsController {
                 const senderPrivateKey = req.body.senderPrivateKey
                 const receiverWalletAddress = req.body.receiverAddress 
                 const feeRate = req.body.feeRate || 10 // 0.0001 (if rate fee is not set)
+                
+                // validate required fields
+                const requiredFields = ['amount', 'crypto_id', 'receiverAddress', 'senderPrivateKey'];
+                for (const field of requiredFields) {
+                    if (!req.body[field]) {
+                        return res.status(400).json({
+                            success: false, 
+                            method: "createAndSend" + cryptoSymbol, 
+                            path: , 
+                            error: `Missing required field: ${field}`
+                        });
+                    }
+                }
 
+                let result;
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
                         senderPrivateKey, 
