@@ -75,18 +75,18 @@ class TransactionsController {
                 const transactionStatus = 1;
                 const cryptoSymbol = req.body.crypto_symbol
                 const amount = req.body.amount;
-                const senderPrivateKey = req.body.senderPrivateKey
-                const receiverWalletAddress = req.body.receiverAddress 
+                const senderPrivateKey = req.body.privateKey
+                const receiverWalletAddress = req.body.toAddress 
                 const feeRate = req.body.feeRate || 10 // 0.0001 (if rate fee is not set)
                 
                 // validate required fields
-                const requiredFields = ['amount', 'crypto_id', 'receiverAddress', 'senderPrivateKey'];
+                const requiredFields = ['amount', 'crypto_symbol', 'toAddress', 'privateKey'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
                             success: false, 
                             method: "createAndSend" + cryptoSymbol, 
-                            path: , 
+                            path: field,
                             error: `Missing required field: ${field}`
                         });
                     }
