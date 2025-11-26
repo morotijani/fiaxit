@@ -22,6 +22,10 @@ const Transaction = mysql.define('fiaxit_transactions', {
         type: DataTypes.STRING(100),
         allowNull: false
     },
+    transaction_to: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    }, 
     transaction_amount: {
         type: DataTypes.DECIMAL(15, 8), // DECIMAL is better for financial data than DOUBLE
         allowNull: false

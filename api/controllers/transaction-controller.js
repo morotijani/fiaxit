@@ -1,4 +1,5 @@
 const Transaction = require("../models/transaction-model");
+const Wallet = require("../models/wallet-model");
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service')
@@ -12,7 +13,12 @@ class TransactionsController {
                 const userId = req.userData.user_id;
                 const { count, rows } = await Transaction.findAndCountAll({
                     where: {
-                        transaction_by: userId
+                        // only get transactions of the logged in user
+                        // either sent or received by the user
+                        [Sequelize.Op.or]: [
+                            { transaction_by: userId },
+                            { transaction_to: userId }
+                        ]
                     },
                     order: [['createdAt', 'DESC']]
                 });
@@ -72,7 +78,7 @@ class TransactionsController {
                 const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
-                const transactionStatus = 1;
+                const transactionStatus = 'Pending';
                 const cryptoSymbol = req.body.crypto_symbol
                 const amount = req.body.amount;
                 const senderPrivateKey = req.body.privateKey
@@ -108,9 +114,9 @@ class TransactionsController {
                         console.error('Transaction failed:', result.error, result.details);
                         res.status(422).json({
                             success: false, 
-                            method: "createAndSend" + cryptoSymbol,
+                            method: "createAndSend" + cryptoSymbol, 
                             message: "Bitcoin Transaction failed", 
-                            result: result.error,
+                            result: result.error, 
                             details: result.details
                         });
                     }
@@ -151,12 +157,39 @@ class TransactionsController {
                     }
                 }
 
+                // get transaction to id and save to db
+                let to_id = null;
+                try {
+                    const toWallet = await Wallet.findOne({
+                        where: {
+                            wallet_address: receiverWalletAddress
+                        }
+                    });
+                    if (toWallet) {
+                        to_id = toWallet.wallet_for;
+                        console.log("Receiver wallet found in our system:", toWallet.wallet_address);
+                    } else {
+                        console.log("Receiver wallet not found in our system:", receiverWalletAddress);
+                    }
+                } catch (err) {
+                    console.error("Error finding receiver wallet:", err);
+                }
+
+                let transactionType = 'send';
+                if (to_id === userId) {
+                    transactionType = 'receive';
+                }
+               
+                // save transaction to db
                 if (result && result.txid) {
+                    transactionStatus = 'Completed';
                     const transaction = await Transaction.create({
                         transaction_id: transactionId, 
                         transaction_hash_id: result.txid,
                         transaction_by: userId, 
+                        transaction_to: to_id, 
                         transaction_amount: amount, 
+                        transaction_type: transactionType, 
                         transaction_crypto_id: req.body.crypto_id, 
                         transaction_crypto_symbol: cryptoSymbol, 
                         transaction_crypto_name: req.body.crypto_name, 
