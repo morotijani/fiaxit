@@ -4,6 +4,7 @@ const USDTService = require('../service/usdt-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const ethers = require('ethers'); // added
+const { default: axios, head } = require("axios");
 
 class WalletsController {
 
@@ -19,20 +20,107 @@ class WalletsController {
                     },
                     order: [['createdAt', 'DESC']]
                 });
+
+                // robust single-address fetcher with normalization and timeout
+                const fetchWalletBalance = async (address, symbol) => {
+                    if (!address) return 0;
+                    const token = req.headers.authorization?.split(' ')[1] || '';
+                    const url = `http://sites.local:8000/v1/wallets/${encodeURIComponent(symbol)}/${encodeURIComponent(address)}/balance`;
+                    try {
+                        const resp = await axios.get(url, {
+                            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                            timeout: 5000
+                        });
+                        const body = resp && resp.data ? resp.data : {};
+                        // support multiple shapes: { data: { ... } }, { payload: { data: { ... } } }, or direct
+                        const payload = body.data ?? body.payload?.data ?? body.payload ?? body;
+                        // Normalize common shapes
+                        if (symbol === 'ETH') {
+                            const val = payload?.balanceEth ?? payload?.balance ?? payload?.eth?.balance ?? payload?.balance?.eth;
+                            return Number(val ?? 0) || 0;
+                        }
+                        if (symbol === 'USDT') {
+                            const val = payload?.usdt?.balance ?? payload?.balance ?? payload?.balance?.usdt;
+                            return Number(val ?? 0) || 0;
+                        }
+                        if (symbol === 'BTC') {
+                            // btc might be nested under balance.btc or returned as btc
+                            const val = payload?.balance?.btc ?? payload?.balance ?? payload?.btc ?? payload?.btcBalance;
+                            // some services return strings; ensure numeric
+                            return Number(val ?? 0) || 0;
+                        }
+                        // generic fallback: try any numeric field
+                        if (typeof payload === 'object') {
+                            const candidates = [payload?.balance, payload?.amount, payload?.value, payload?.balanceEth];
+                            for (const c of candidates) {
+                                if (c !== undefined && c !== null && !isNaN(Number(c))) return Number(c);
+                            }
+                        }
+                        return 0;
+                    } catch (err) {
+                        console.warn(`Balance fetch failed for ${symbol} ${address}:`, err.message || err);
+                        return 0;
+                    }
+                };
+
+                // Fetch balances in parallel (guarded) and attach results
+                const settled = await Promise.allSettled(
+                    rows.map(w => fetchWalletBalance(w.wallet_address, w.wallet_symbol))
+                );
+
+                for (let i = 0; i < rows.length; i++) {
+                    const walletRow = rows[i];
+                    let balanceNumeric = 0;
+                    const r = settled[i];
+                    if (r && r.status === 'fulfilled') {
+                        balanceNumeric = Number(r.value) || 0;
+                    } else {
+                        console.warn(`Failed to fetch balance for row index ${i} (${walletRow.wallet_symbol} ${walletRow.wallet_address})`);
+                        balanceNumeric = 0;
+                    }
+                    // attach to Sequelize instance safely
+                    walletRow.dataValues = walletRow.dataValues || {};
+                    walletRow.dataValues.wallet_balance = balanceNumeric;
+                }
+
+                // --- NEW: fetch unique current market prices (USD) for the returned wallet symbols ---
+                const COINGECKO_ID_MAP = { ETH: 'ethereum', USDT: 'tether', BTC: 'bitcoin' };
+                const uniqueSymbols = Array.from(new Set(rows.map(r => (r.wallet_symbol || '').toUpperCase()).filter(Boolean)));
+                const ids = uniqueSymbols
+                    .map(sym => COINGECKO_ID_MAP[sym] || sym.toLowerCase())
+                    .filter(Boolean);
+                let rates = {};
+                if (ids.length > 0) {
+                    try {
+                        const idsParam = encodeURIComponent(ids.join(','));
+                        const resp = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${idsParam}&vs_currencies=usd`);
+                        const priceData = resp && resp.data ? resp.data : {};
+                        // map back to symbols while avoiding duplicates
+                        for (const sym of uniqueSymbols) {
+                            const id = COINGECKO_ID_MAP[sym] || sym.toLowerCase();
+                            const usd = priceData[id] && (priceData[id].usd ?? priceData[id].USD);
+                            rates[sym] = { id, usd: (typeof usd === 'number' ? usd : null) };
+                        }
+                    } catch (err) {
+                        console.warn("Failed to fetch CoinGecko prices:", err.message || err);
+                        // rates stays empty on failure
+                    }
+                }
                 
                 res.status(200).json({
                     success: true, 
                     method: "getAllWallet", 
                     message: "All wallet displayed.", 
                     data: rows, 
-                    total: count
+                    total: count,
+                    rates // <- added rates here, deduplicated by symbol
                 })
             } catch(err) {
                 res.status(422).json({
                     success: false, 
                     method: "getAllWallet",
                     error: "Error occured fetching all wallets", 
-                    details: err.error
+                    details: err.error || err.message || err
                 })
             }
         }
@@ -389,6 +477,23 @@ class WalletsController {
                 }
             };
 
+            // function to get rate of crypto using external service APIs
+            const getCryptoRate = async (symbol, fiat) => {
+                symbol = symbol.toLowerCase() ?? '';
+                fiat = fiat.toLowerCase() ?? 'usd';
+                try {
+                    const resp = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=${fiat}`);
+                    // const exchangeRate = response.data[cryptoId][fiatId];
+                    const rate = resp.data && resp.data[symbol] && resp.data[symbol][fiat];
+                    console.log(`Fetched rate for ${symbol.toUpperCase()}/${fiat.toUpperCase()}:`, rate);
+                    return rate || 1;
+
+                } catch (error) {
+                    console.error("Error fetching crypto rate:", error);
+                }
+                return 1; // Placeholder implementation
+            };
+
             try {
                 const userId = req.userData.user_id;
                 const wallets = await Wallet.findAll({
@@ -480,6 +585,11 @@ class WalletsController {
                     
                     totals[symbol]['amount'] = (totals[symbol]['amount'] || 0) + numeric;
                     totals[symbol]['name'] = wallet.wallet_crypto_name || null;
+                    // Fetch and store fiat equivalent
+                    const rate = await getCryptoRate(totals[symbol]['name'], 'usd');
+                    const fiatEquivalent = ((totals[symbol]['amount'] || 0) * rate);
+                    totals[symbol]['fiat_equivalent'] = fiatEquivalent;
+                    
                 }
 
                 return res.status(200).json({
