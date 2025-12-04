@@ -1,5 +1,6 @@
 const Transaction = require("../models/transaction-model");
 const Wallet = require("../models/wallet-model");
+const { Op } = require('sequelize'); // Import the Op object
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service')
@@ -11,16 +12,20 @@ class TransactionsController {
         return async (req, res, next) => {
             try {
                 const userId = req.userData.user_id;
+                const limit = parseInt(req.query.limit) || 50; // default limit to 50
+                const offset = parseInt(req.query.offset) || 0; // default offset to 0
                 const { count, rows } = await Transaction.findAndCountAll({
                     where: {
                         // only get transactions of the logged in user
                         // either sent or received by the user
-                        [Sequelize.Op.or]: [
+                        [Op.or]: [
                             { transaction_by: userId },
                             { transaction_to: userId }
                         ]
                     },
-                    order: [['createdAt', 'DESC']]
+                    order: [['createdAt', 'DESC']],
+                    limit: limit,
+                    offset: offset
                 });
                 res.status(200).json({
                     success: true,
