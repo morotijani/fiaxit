@@ -38,8 +38,9 @@ class UsersController {
     signup = () => {
         return async (req, res, next) => {
             try {
-                const userId = uuidv4();
-                const vericode = uuidv4(); // Generate a random code for email verification code
+                const userId = uuidv4() + '-' + Date.now(); // Generate a unique user ID
+                const vericode = uuidv4() + '-' + Date.now(); // Generate a random code for email verification code
+                // const vericode = Math.floor(100000 + Math.random() * 900000); // generate a random 6-digit code
 
                 // check if email is a valid email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,6 +67,24 @@ class UsersController {
                         path: "email", 
                         message: "User registration failed: Email already exist."
                     })
+                }
+
+                // check if phone number already exist
+                if (req.body.phone) {
+                    const isPhoneExist = await User.findOne({
+                        where: {
+                            user_phone: req.body.phone
+                        }
+                    })
+
+                    if (isPhoneExist) {
+                        return res.status(401).json({
+                            success: false, 
+                            method: "registerUser", 
+                            path: "phone", 
+                            message: "User registration failed: Phone number already exist."
+                        })
+                    }
                 }
 
                 // check for password length and characters
@@ -132,10 +151,18 @@ class UsersController {
                     html: `
                         <h3>${req.body.fname},</h3>
                         <p>Thank you for registering with Fiaxit 👻. 
-                        <br>Please click on the following link to verify your account: <a href="http://sites.local:8000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:6000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
+                        // <br>
+                        // Your verification code is: <b>${vericode}</b>
+                        // <br><br>
+                        // Enter this code in the app to verify your account. This code expires in 5 minutes.
+                        // <br><br>
+                        // If you did not request the code, you can safely ignore this message.
+                        <br><br>
+                        Please click on the following link to verify your account: <a href="http://sites.local:8000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:8000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
                         <br>
-                        http://sites.local:8000/v1/auth/verify/${userId}/${vericode}
+                        BE: http://sites.local:8000/v1/auth/verify/${userId}/${vericode}
                         <br>
+                        UI: http://sites.local:3000/auth/verify/${userId}/${vericode}
                         <br>
                         With love,
                         <br>
@@ -177,6 +204,7 @@ class UsersController {
             try {
                 const uid = req.params.id;
                 const code = req.params.code
+                let response = {}
 
                 // check if user id exist 
                 const user = await User.findOne({
@@ -189,6 +217,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
+                        status: "invalid_user", 
                         message: "Verification failed: User not found"
                     })
                 }
@@ -198,7 +227,22 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
+                        status: "invalid_code", 
                         message: "Verification failed: Invalid verification code"
+                    })
+                }
+
+                // check if verification code is expired by using the time account was created and the next 15 min
+                const createdAt = new Date(user.createdAt);
+                const now = new Date();
+                const diffMinutes = Math.floor((now - createdAt) / 1000 / 60); // time difference in minutes
+
+                if (diffMinutes > 15) {
+                    return res.status(400).json({
+                        success: false,
+                        method: "verifyUser",
+                        status: "expired", 
+                        message: "Verification failed: Verification code has expired"
                     })
                 }
 
@@ -207,6 +251,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false, 
                         method: "verifyUser", 
+                        status: "is_verified", 
                         message: "Verification failed: You are already verified"
                     })
                 }
@@ -223,6 +268,7 @@ class UsersController {
                     return res.status(500).json({
                         success: false, 
                         method: "verifyUser", 
+                        status: "network_error", 
                         message: "Verification failed: An error occured while verifying user.", 
                     })
                 }
@@ -890,7 +936,45 @@ class UsersController {
             }
         };
     }
+
+    // find user by id
+    getUserById = () => {
+        return async (req, res, next) => {
+            try {
+                const userId = req.params.id;
+                const user = await User.findOne({
+                    where: {
+                        user_id: userId
+                    }
+                });
+
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "findUserById",
+                        message: "User not found."
+                    });
+                }
+
+                return res.status(200).json({
+                    success: true,
+                    method: "findUserById",
+                    data: user
+                });
+
+            } catch (error) {
+                console.error('Error in findUserById:', error);
+                return res.status(500).json({
+                    success: false,
+                    method: "findUserById",
+                    message: "An error occurred while retrieving the user.",
+                    details: error.message
+                });
+            }
+        };
+    }
     
+    // 
     generateVerificationCode = () => {
         return Math.floor(Math.random() * (999999 - 100001)) + 100001;
     }

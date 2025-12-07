@@ -65,4 +65,8 @@ router.post('/verify-reset-code', AuthController.verifyResetCode()) // Endpoint 
 */
 router.post('/reset-password', AuthController.resetPassword()) // reset password
 
+// GET USER BY ID
+// Usage (example): GET /api/v1/user/:id
+router.get('/user/:id', AuthController.getUserById());
+
 module.exports = router;
