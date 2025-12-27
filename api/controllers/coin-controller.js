@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 class CoinController {
     // Get all supported coins
-    getAllPins = () => {
+    getAllCoins = () => {
         return async (req, res) => {
             try {
                 const coins = await Coin.findAll({

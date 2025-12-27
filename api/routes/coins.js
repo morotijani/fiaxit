@@ -3,8 +3,8 @@ const router = express.Router();
 const coinController = require('../controllers/coin-controller');
 const { authenticate, isAdmin } = require('../middleware/check-auth');
 
-// Public: Get all coins
-router.get('/', coinController.getAllPins());
+// Public:// Get all supported coins
+router.get('/', coinController.getAllCoins());
 
 // Admin: Add a coin
 router.post('/', authenticate, isAdmin, coinController.addCoin());

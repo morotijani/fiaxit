@@ -1,71 +1,37 @@
 const crypto = require('crypto');
 
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16;
-const SALT_LENGTH = 64;
-const TAG_LENGTH = 16;
-const KEY_LENGTH = 32;
-const ITERATIONS = 100000;
+const algorithm = 'aes-256-cbc';
+const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default_secret_key_at_least_32_chars_long_12345', 'hex');
+const ivLength = 16;
 
 /**
- * Encrypts a string using a master key from environment variables.
- * @param {string} text - The text to encrypt.
- * @returns {string} - The encrypted string in the format: salt:iv:authTag:encryptedText
+ * Encrypts sensitive text using AES-256-CBC
+ * @param {string} text 
+ * @returns {string} iv:encryptedText (hex)
  */
 function encrypt(text) {
     if (!text) return null;
-    
-    const masterKey = process.env.ENCRYPTION_KEY || 'default-secret-key-change-me-in-production';
-    const salt = crypto.randomBytes(SALT_LENGTH);
-    const iv = crypto.randomBytes(IV_LENGTH);
-    
-    const key = crypto.pbkdf2Sync(masterKey, salt, ITERATIONS, KEY_LENGTH, 'sha512');
-    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    
+    const iv = crypto.randomBytes(ivLength);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
-    const authTag = cipher.getAuthTag().toString('hex');
-    
-    return `${salt.toString('hex')}:${iv.toString('hex')}:${authTag}:${encrypted}`;
+    return iv.toString('hex') + ':' + encrypted;
 }
 
 /**
- * Decrypts a string previously encrypted with the encrypt function.
- * @param {string} encryptedData - The string in salt:iv:authTag:encryptedText format.
- * @returns {string} - The original decrypted text.
+ * Decrypts text encrypted by the above function
+ * @param {string} text iv:encryptedText
+ * @returns {string} decryptedText
  */
-function decrypt(encryptedData) {
-    if (!encryptedData) return null;
-    
-    try {
-        const parts = encryptedData.split(':');
-        if (parts.length !== 4) {
-            // Probably not encrypted or wrong format
-            return encryptedData; 
-        }
-        
-        const [saltHex, ivHex, authTagHex, encryptedText] = parts;
-        const masterKey = process.env.ENCRYPTION_KEY || 'default-secret-key-change-me-in-production';
-        
-        const salt = Buffer.from(saltHex, 'hex');
-        const iv = Buffer.from(ivHex, 'hex');
-        const authTag = Buffer.from(authTagHex, 'hex');
-        
-        const key = crypto.pbkdf2Sync(masterKey, salt, ITERATIONS, KEY_LENGTH, 'sha512');
-        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-        
-        decipher.setAuthTag(authTag);
-        
-        let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        
-        return decrypted;
-    } catch (error) {
-        console.error('Decryption failed:', error.message);
-        // If decryption fails, return the original data (might be old unencrypted data)
-        return encryptedData;
-    }
+function decrypt(text) {
+    if (!text || !text.includes(':')) return null;
+    const parts = text.split(':');
+    const iv = Buffer.from(parts.shift(), 'hex');
+    const encryptedText = Buffer.from(parts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
 }
 
 module.exports = { encrypt, decrypt };

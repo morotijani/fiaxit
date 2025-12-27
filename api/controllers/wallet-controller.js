@@ -1,9 +1,11 @@
 const Wallet = require("../models/wallet-model");
+const Coin = require("../models/coin-model"); // added
 const { v4: uuidv4 } = require('uuid')
 const USDTService = require('../service/usdt-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
-const ethers = require('ethers'); // added
+const { encrypt, decrypt } = require('../helpers/encryption'); // added
+const ethers = require('ethers');
 const { default: axios, head } = require("axios");
 
 class WalletsController {
@@ -15,9 +17,10 @@ class WalletsController {
                 const userId = req.userData.user_id;
                 const { count, rows } = await Wallet.findAndCountAll({
                     where: {
-                        wallet_for: userId, 
+                        wallet_for: userId,
                         wallet_status: 0 // only active wallets
                     },
+                    attributes: { exclude: ['wallet_privatekey', 'wallet_mnemonic'] },
                     order: [['createdAt', 'DESC']]
                 });
 
@@ -106,20 +109,20 @@ class WalletsController {
                         // rates stays empty on failure
                     }
                 }
-                
+
                 res.status(200).json({
-                    success: true, 
-                    method: "getAllWallet", 
-                    message: "All wallet displayed.", 
-                    data: rows, 
+                    success: true,
+                    method: "getAllWallet",
+                    message: "All wallet displayed.",
+                    data: rows,
                     total: count,
                     rates // <- added rates here, deduplicated by symbol
                 })
-            } catch(err) {
+            } catch (err) {
                 res.status(422).json({
-                    success: false, 
+                    success: false,
                     method: "getAllWallet",
-                    error: "Error occured fetching all wallets", 
+                    error: "Error occured fetching all wallets",
                     details: err.error || err.message || err
                 })
             }
@@ -134,21 +137,25 @@ class WalletsController {
 
             const wallet = await Wallet.findOne({
                 where: {
-                    wallet_id: walletId,  
+                    wallet_id: walletId,
                     wallet_for: userId
                 }
             })
             const resp = {
-                success: false, 
-                method: "findById", 
-                message: "Wallet not found!", 
+                success: false,
+                method: "findById",
+                message: "Wallet not found!",
                 wallet: null
             }
             if (wallet) {
                 resp.success = true;
                 resp.method = "findById";
                 resp.message = "Wallet found!";
-                resp.wallet = wallet;
+                // Exclude sensitive data
+                const sanitizedWallet = wallet.toJSON();
+                delete sanitizedWallet.wallet_privatekey;
+                delete sanitizedWallet.wallet_mnemonic;
+                resp.wallet = sanitizedWallet;
             }
             res.status(200).json(resp)
         }
@@ -158,185 +165,170 @@ class WalletsController {
     generateWallet = () => {
         return async (req, res, next) => {
             try {
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                const crypto = req.params.crypto;
+                const isTestnet = req.query.testnet !== 'false';
+                const cryptoSymbol = req.params.crypto.toUpperCase();
                 const userId = req.userData.user_id;
                 const walletId = uuidv4();
-                
-                // Default empty wallet data
-                let walletXpub = null;
+
+                // 1. Fetch coin configuration from database
+                const coin = await Coin.findOne({
+                    where: { coin_symbol: cryptoSymbol, coin_status: true }
+                });
+
+                if (!coin) {
+                    return res.status(404).json({
+                        success: false,
+                        message: `Coin ${cryptoSymbol} is not supported or active.`
+                    });
+                }
+
+                // 2. Check if user already has a wallet for this coin
+                const existing = await Wallet.findOne({
+                    where: { wallet_for: userId, wallet_symbol: cryptoSymbol, wallet_status: 0 }
+                });
+
+                if (existing) {
+                    return res.status(409).json({
+                        success: false,
+                        message: `You already have an active ${cryptoSymbol} wallet.`
+                    });
+                }
+
                 let walletAddress = null;
-                let encryptedData = null; // For storing encrypted sensitive data if needed
                 let walletPrivatekey = null;
                 let walletMnemonic = null;
-                
-                if (crypto === 'BTC') {
+                let walletCryptoName = coin.coin_name;
+
+                // 3. Generate wallet based on coin_type
+                const coinType = coin.coin_type; // BTC, ETH, ERC20, etc.
+
+                if (coinType === 'BTC') {
                     try {
                         const wallet = await BitcoinWalletService.generateWallet(isTestnet);
-                        // const wallet = walletResponse.wallet;
-                        console.log('Generated wallet:', wallet);
-                        
-                        walletXpub = null;
-                        walletAddress = wallet.address
-                        walletPrivatekey = wallet.privateKey // For development only
-                        walletMnemonic = wallet.mnemonic; // For development only
-                        walletCryptoName = 'Bitcoin';
-                        
-                        // For development only - log sensitive data (REMOVE IN PRODUCTION)
-                        // if (process.env.NODE_ENV !== 'production') {
-                        //     console.log('DEVELOPMENT MODE - Sensitive wallet data:');
-                        //     console.log('Private Key:', xpriv.privateKey.toString());
-                        //     console.log('Mnemonic:', passPhrase.toString());
-                        // }
-                    } catch (error)  {
-                        return res.status(500).json({
-                            success: false, 
-                            error: "Failed to generate Bitcoin wallet", 
-                            details: error.message
-                        })
+                        walletAddress = wallet.address;
+                        walletPrivatekey = encrypt(wallet.privateKey);
+                        walletMnemonic = encrypt(wallet.mnemonic);
+                    } catch (error) {
+                        throw new Error(`Failed to generate Bitcoin wallet: ${error.message}`);
                     }
-                } else if (crypto === 'USDT') {
+                } else if (coinType === 'ETH' || coinType === 'ERC20') {
+                    try {
+                        // For ETH/ERC20 we use the same address generation
+                        const network = isTestnet ? 'sepolia' : (coin.coin_network || 'mainnet');
+                        EthereumWalletService.setNetwork(network);
+                        const wallet = EthereumWalletService.generateWallet();
+
+                        walletAddress = wallet.address;
+                        walletPrivatekey = encrypt(wallet.privateKey);
+                        walletMnemonic = encrypt(wallet.mnemonic);
+                    } catch (error) {
+                        throw new Error(`Failed to generate Ethereum-based wallet: ${error.message}`);
+                    }
+                } else if (coinType === 'TRC20') {
+                    // For now fallback to USDT service or throw not implemented
                     try {
                         const wallet = USDTService.generateWallet();
-                        walletXpub = null 
-                        walletAddress = wallet.address
-                        walletPrivatekey = wallet.privateKey
-                        walletMnemonic = wallet.mnemonic
-                        walletCryptoName = 'Tether USD';
-                        
-                        console.log("USDT Wallet generated:", wallet);
-                    } catch (error) {
-                        console.error("USDT Wallet generation error:", error);
-                        res.status(500).json({
-                            success: false, 
-                            error: "Failed to generate USDT wallet", 
-                            details: error.message
-                        });
-                    }
-                } else if (crypto === 'ETH') {
-                    // Ethereum wallet generation
-                    try {
-			            // Check if a specific network was requested
-                        const network = ((isTestnet) ? 'sepolia' : req.query.network);
-                        if (network) {
-                            EthereumWalletService.setNetwork(network);
-                        } else {
-                            return res.status(400).json({
-                                success: false,
-                                error: "Network is required for Ethereum wallet generation"
-                            });
-                        }
-
-                        const wallet = EthereumWalletService.generateWallet();
-                        
                         walletAddress = wallet.address;
-                        walletPrivatekey = wallet.privateKey;
-                        walletMnemonic = wallet.mnemonic;
-                        walletCryptoName = 'Ethereum';
-                        
-                        console.log("Generated ETH wallet:", wallet);
+                        walletPrivatekey = encrypt(wallet.privateKey);
+                        walletMnemonic = encrypt(wallet.mnemonic);
                     } catch (error) {
-                        console.error("ETH Wallet generation error:", error);
-                        res.status(500).json({
-                            success: false,
-                            error: "Failed to generate Ethereum wallet", 
-                            details: error.message
-                        });
+                        throw new Error(`Failed to generate TRC20 wallet: ${error.message}`);
                     }
-                    
                 } else {
                     return res.status(400).json({
                         success: false,
-                        method: "createAndGenerate" + crypto +"Wallet",
-                        error: "Invalid crypto currency provided"
+                        error: `Wallet generation not implemented for coin type: ${coinType}`
                     });
                 }
-                
-                const wallet = await Wallet.create({
-                    wallet_id: walletId, 
-                    wallet_for: userId, 
-                    wallet_symbol: crypto, 
+
+                const newWallet = await Wallet.create({
+                    wallet_id: walletId,
+                    wallet_for: userId,
+                    wallet_symbol: cryptoSymbol,
                     wallet_crypto_name: walletCryptoName,
-                    wallet_xpub: walletXpub, 
-                    wallet_address: walletAddress, 
+                    wallet_address: walletAddress,
                     wallet_privatekey: walletPrivatekey,
                     wallet_mnemonic: walletMnemonic
                 });
-                
+
                 res.status(201).json({
                     success: true,
-                    method: "createAndGenerate"+crypto+"Wallet",
-                    message: `${crypto} Wallet address successfully generated.`, 
-                    wallet: wallet
+                    message: `${cryptoSymbol} wallet successfully generated.`,
+                    wallet: {
+                        wallet_id: newWallet.wallet_id,
+                        wallet_address: newWallet.wallet_address,
+                        wallet_symbol: newWallet.wallet_symbol,
+                        wallet_crypto_name: newWallet.wallet_crypto_name
+                    }
                 });
-            } catch(err) {
-                console.error(crypto + " wallet address creation error:", err);
-                res.status(422).json({
+            } catch (err) {
+                console.error("Wallet generation error:", err);
+                res.status(500).json({
                     success: false,
-                    error: "There was an error generating " + crypto + " wallet", 
-                    details: err.message || "An error occurred during wallet address creation"
+                    error: "Critical error during wallet generation",
+                    details: err.message
                 });
             }
         }
     }
 
     /**
-   		* Validate Ethereum address
-		* @param {Object} req - Express request object
-		* @param {Object} res - Express response object
-	*/
-  	validateETHAddress = (req, res) => {
-    	try {
-      		const { address } = req.params;
-      
-			if (!address) {
-				return res.status(400).json({
-                    success: false, 
-                    method: "validateETHAddress", 
+                * Validate Ethereum address
+        * @param {Object} req - Express request object
+        * @param {Object} res - Express response object
+    */
+    validateETHAddress = (req, res) => {
+        try {
+            const { address } = req.params;
+
+            if (!address) {
+                return res.status(400).json({
+                    success: false,
+                    method: "validateETHAddress",
                     error: "Ethereum wallet address is required."
-				});
-			}
-			
-			const isValid = EthereumWalletService.isValidEthereumAddress(address);
-			
-			res.status(200).json({
-				success: true,
-				method: "validateETHAddress", 
-                message: "Ethereum wallet address validated.", 
-				data: {
-					address, 
-					isValid
-				}
-			});
-		} catch (error) {
-			console.error("Address validation error:", error);
-			res.status(422).json({
-				success: false,
-				error: "There was a problem validating Ethereum wallet address.", 
+                });
+            }
+
+            const isValid = EthereumWalletService.isValidEthereumAddress(address);
+
+            res.status(200).json({
+                success: true,
+                method: "validateETHAddress",
+                message: "Ethereum wallet address validated.",
+                data: {
+                    address,
+                    isValid
+                }
+            });
+        } catch (error) {
+            console.error("Address validation error:", error);
+            res.status(422).json({
+                success: false,
+                error: "There was a problem validating Ethereum wallet address.",
                 details: error.message || "An error occurred while validating the Ethereum wallet address",
-			});
-		}
-	}
+            });
+        }
+    }
 
     // update
     update = () => {
         return async (req, res, next) => {
             // Start a database transaction for data integrity
             const dbTransaction = await Transaction.sequelize.transaction();
-            
+
             try {
                 const userId = req.userData.user_id;
                 const transactionId = req.params.id;
-                
+
                 // Find the transaction within the transaction context
                 const transaction = await Transaction.findOne({
                     where: {
-                        transaction_id: transactionId, 
+                        transaction_id: transactionId,
                         transaction_by: userId
                     },
                     transaction: dbTransaction
                 });
-                
+
                 if (!transaction) {
                     await dbTransaction.rollback();
                     return res.status(404).json({
@@ -345,7 +337,7 @@ class WalletsController {
                         message: "Transaction not found or you don't have permission to update it."
                     });
                 }
-                
+
                 // Prevent updates to completed/processed transactions
                 if (transaction.transaction_status > 1) {
                     await dbTransaction.rollback();
@@ -355,25 +347,25 @@ class WalletsController {
                         message: "Cannot update a processed transaction."
                     });
                 }
-                
+
                 // Build update object with only provided fields
                 const updateFields = {};
                 const allowedFields = [
-                    'transaction_amount', 
-                    'transaction_crypto_id', 
-                    'transaction_crypto_symbol', 
-                    'transaction_crypto_name', 
-                    'transaction_crypto_price', 
-                    'transaction_to_wallet_address', 
+                    'transaction_amount',
+                    'transaction_crypto_id',
+                    'transaction_crypto_symbol',
+                    'transaction_crypto_name',
+                    'transaction_crypto_price',
+                    'transaction_to_wallet_address',
                     'transaction_message'
                 ];
-                
+
                 allowedFields.forEach(field => {
                     if (req.body[field] !== undefined) {
                         updateFields[field] = req.body[field];
                     }
                 });
-                
+
                 if (Object.keys(updateFields).length === 0) {
                     await dbTransaction.rollback();
                     return res.status(400).json({
@@ -382,28 +374,28 @@ class WalletsController {
                         message: "No valid fields provided for update."
                     });
                 }
-                
+
                 // Update within transaction context
                 await transaction.update(updateFields, { transaction: dbTransaction });
-                
+
                 // Commit the transaction
                 await dbTransaction.commit();
-                
+
                 res.status(200).json({
                     success: true,
-                    method: "update", 
-                    message: "Transaction updated successfully.", 
+                    method: "update",
+                    message: "Transaction updated successfully.",
                     data: {
                         transaction: transaction
                     }
                 });
-            } catch(err) {
+            } catch (err) {
                 // Rollback on error
                 await dbTransaction.rollback();
                 console.error("Transaction update error:", err);
                 res.status(422).json({
                     success: false,
-                    error: "There was a problem updating transaction.", 
+                    error: "There was a problem updating transaction.",
                     details: err.message || "An error occurred during transaction update."
                 });
             }
@@ -418,14 +410,14 @@ class WalletsController {
                 const transactionId = req.params.id;
                 const transaction = await Transaction.findOne({
                     where: {
-                        transaction_id: transactionId, 
+                        transaction_id: transactionId,
                         transaction_by: userId
                     }
                 });
                 const resp = {
-                    success: false, 
-                    method: "deleteTransaction", 
-                    message: "Transaction not found.", 
+                    success: false,
+                    method: "deleteTransaction",
+                    message: "Transaction not found.",
                     data: {
                         transaction: null
                     }
@@ -441,7 +433,7 @@ class WalletsController {
                 console.error("Transaction deletion error:", err);
                 res.status(422).json({
                     success: false,
-                    error: "Something went wrong, please try again.", 
+                    error: "Something went wrong, please try again.",
                     details: err.message || "An error occurred during transaction deletion."
                 });
             }
@@ -578,18 +570,18 @@ class WalletsController {
                         console.error(`Error fetching balance for ${symbol} ${address}:`, innerErr && innerErr.message);
                         numeric = 0;
                     }
-                    
+
                     if (!totals[symbol]) {
                         totals[symbol] = {};
                     }
-                    
+
                     totals[symbol]['amount'] = (totals[symbol]['amount'] || 0) + numeric;
                     totals[symbol]['name'] = wallet.wallet_crypto_name || null;
                     // Fetch and store fiat equivalent
                     const rate = await getCryptoRate(totals[symbol]['name'], 'usd');
                     const fiatEquivalent = ((totals[symbol]['amount'] || 0) * rate);
                     totals[symbol]['fiat_equivalent'] = fiatEquivalent;
-                    
+
                 }
 
                 return res.status(200).json({
