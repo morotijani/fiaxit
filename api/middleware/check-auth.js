@@ -6,11 +6,11 @@ const UserKyc = require('../models/user-kyc-model');
 // Create Redis client
 let redisClient;
 if (process.env.NODE_ENV !== 'production') {
-    redisClient = redis.createClient({ 
+    redisClient = redis.createClient({
         url: 'redis://127.0.0.1:6379'
     });
 } else {
-    redisClient = redis.createClient({ 
+    redisClient = redis.createClient({
         username: process.env.REDIS_USERNAME || 'default',
         password: process.env.REDIS_PASSWORD,
         socket: {
@@ -33,19 +33,19 @@ if (process.env.NODE_ENV !== 'production') {
 
         await redisClient.connect();
         console.log("Connected to Redis.");
-    } catch(err) {
+    } catch (err) {
         console.error('Redis connection error:', err);
     }
 })();
 
-const authenticate = async(req, res, next) => {
+const authenticate = async (req, res, next) => {
     try {
         // Get token from authorization header
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({
-                success: false, 
-                method: "authentication", 
+                success: false,
+                method: "authentication",
                 message: "Authentication required: No token provided."
             });
         }
@@ -57,8 +57,8 @@ const authenticate = async(req, res, next) => {
         const isBlacklisted = await redisClient.get(`blacklist:${token}`);
         if (isBlacklisted) {
             return res.status(401).json({
-                success: false, 
-                method: "authentication", 
+                success: false,
+                method: "authentication",
                 message: "Authentication failed: Token blacklisted (Token has been revoked) Please login again."
             });
         }
@@ -68,14 +68,14 @@ const authenticate = async(req, res, next) => {
 
         const user = await User.findOne({ // get user
             where: {
-                user_id : decoded.user_id
+                user_id: decoded.user_id
             }
         })
 
         if (!user) {
             return res.status(401).json({
-                success: false, 
-                method: "authentication", 
+                success: false,
+                method: "authentication",
                 message: "Authentication failed: User not found."
             });
         }
@@ -84,44 +84,44 @@ const authenticate = async(req, res, next) => {
         // check if user in the kyc table and merge it to user
         const userKyc = await UserKyc.findOne({ // get user
             where: {
-                kyc_for : decoded.user_id
+                kyc_for: decoded.user_id
             }
         })
 
         // if (userKyc) {
-            // merge userKyc to user
+        // merge userKyc to user
         //     req.userData = { ...user, ...userKyc };
         // }
-        
+
 
         // Attach user data to request
         req.userData = decoded || user;
         req.token = token; // Store token for potential use in other middleware/controllers
-        
+
         // Continue to the next middleware/router handler
         next();
-    } catch(error) {
+    } catch (error) {
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({
-                success: false, 
-                method: "authentication", 
+                success: false,
+                method: "authentication",
                 message: "Authentication failed: Token expired. Please login again."
             });
         }
 
         if (error.name === 'JsonWebTokenError') {
             return res.status(401).json({
-                success: false, 
-                method: "authentication", 
+                success: false,
+                method: "authentication",
                 message: "Authentication failed: Invalid token. Please login again."
             });
         }
 
         console.error('Authentication error:', error);
         return res.status(500).json({
-            success: false, 
-            method: "authentication", 
-            message: 'Authentication failed: An error occurred while authenticating the user.', 
+            success: false,
+            method: "authentication",
+            message: 'Authentication failed: An error occurred while authenticating the user.',
             error: error.message
         });
     }
@@ -153,4 +153,37 @@ const blacklistToken = async (token) => {
     }
 };
 
-module.exports = { authenticate, blacklistToken };
+// Middleware to check if user is admin
+const isAdmin = async (req, res, next) => {
+    try {
+        // req.userData is set by authenticate middleware
+        if (!req.userData || !req.userData.user_id) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: User data missing."
+            });
+        }
+
+        const user = await User.findOne({
+            where: { user_id: req.userData.user_id }
+        });
+
+        if (!user || user.user_role !== 'admin') {
+            return res.status(403).json({
+                success: false,
+                message: "Forbidden: Admin access required."
+            });
+        }
+
+        next();
+    } catch (error) {
+        console.error('isAdmin check error:', error);
+        res.status(500).json({
+            success: false,
+            message: "Error verifying admin status.",
+            error: error.message
+        });
+    }
+};
+
+module.exports = { authenticate, isAdmin, blacklistToken };
