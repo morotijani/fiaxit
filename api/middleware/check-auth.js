@@ -145,7 +145,7 @@ const blacklistToken = async (token) => {
                 return true;
             }
         }
-        console.error('Error blacklisting token:', error);
+        console.error('Error blacklisting token: Token could not be decoded');
         return false;
     } catch (error) {
         console.error('Error blacklisting token:', error);

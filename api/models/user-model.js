@@ -1,4 +1,6 @@
 const db = require('./db');
+const { Sequelize, DataTypes } = require('sequelize');
+const bcrypt = require('bcrypt');
 
 const User = db.define('fiaxit_users', {
     user_id: {
@@ -57,6 +59,10 @@ const User = db.define('fiaxit_users', {
     },
     user_invitationcode: {
         type: DataTypes.STRING(50)
+    },
+    user_role: {
+        type: DataTypes.ENUM('user', 'admin'),
+        defaultValue: 'user'
     },
     createdAt: {
         type: DataTypes.DATE,
