@@ -151,18 +151,21 @@ class UsersController {
                     html: `
                         <h3>${req.body.fname},</h3>
                         <p>Thank you for registering with Fiaxit 👻. 
-                        // <br>
+                        <!-- <br>
                         // Your verification code is: <b>${vericode}</b>
                         // <br><br>
                         // Enter this code in the app to verify your account. This code expires in 5 minutes.
                         // <br><br>
-                        // If you did not request the code, you can safely ignore this message.
+                        // If you did not request the code, you can safely ignore this message. -->
                         <br><br>
                         Please click on the following link to verify your account: <a href="http://sites.local:8000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:8000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
                         <br>
+                        <br>
                         BE: http://sites.local:8000/v1/auth/verify/${userId}/${vericode}
                         <br>
+                        <br>
                         UI: http://sites.local:3000/auth/verify/${userId}/${vericode}
+                        <br>
                         <br>
                         With love,
                         <br>
