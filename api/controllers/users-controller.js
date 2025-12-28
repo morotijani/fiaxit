@@ -381,35 +381,62 @@ class UsersController {
 
                         // send email to log in user
 
+                        // send login notification email
                         const mailOptions = {
-                            from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,
+                            from: `"Fiaxit Security" <${process.env.EMAIL_USERNAME}>`,
                             to: req.body.email,
-                            subject: 'Login Notification',
+                            subject: 'Login Notification | Fiaxit',
                             html: `
-                                <h3>Hello ${user.user_fname},</h3>
-                                <p>We detected a recent sign-in to your Fiaxit Account.</p>
-                                <p><b>Sign-in details<b>:</b></p>
-                                <b>IP Address</b>: ${req.ip}
-                                <br>
-                                <b>Browser</b>: ${req.headers['user-agent']}
-                                <br>
-                                <b>Device</b>: ${req.headers['user-agent']}
-                                <br>
-                                <b>Time</b>: ${new Date()}
-                                <br>
-                                <br>
-                                If you did not initiate this sign-in, please contact our support team immediately.</p>
-                                <br><br>
-                                <p>Thank you for using Fiaxit 👻.</p>
+                                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                                    <div style="text-align: center; padding: 20px 0;">
+                                        <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                                    </div>
+                                    <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                        <h2 style="margin-top: 0; color: #1a202c; font-size: 22px;">New Sign-in Detected</h2>
+                                        <p style="font-size: 16px; color: #4a5568;">Hello ${user.user_fname}, we detected a recent sign-in to your Fiaxit Account.</p>
+                                        
+                                        <div style="background-color: #f8fafc; border-radius: 10px; padding: 20px; margin: 25px 0; border: 1px solid #edf2f7;">
+                                            <h3 style="margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 15px;">Sign-in Details</h3>
+                                            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #718096; width: 100px;">IP Address</td>
+                                                    <td style="padding: 8px 0; color: #2d3748; font-weight: 500;">${req.ip}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #718096;">Device</td>
+                                                    <td style="padding: 8px 0; color: #2d3748; font-weight: 500;">${req.headers['user-agent'].split(')')[0].split('(')[1] || 'Unknown Device'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #718096;">Browser</td>
+                                                    <td style="padding: 8px 0; color: #2d3748; font-weight: 500;">${req.headers['user-agent'].split(' ').pop()}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px 0; color: #718096;">Time</td>
+                                                    <td style="padding: 8px 0; color: #2d3748; font-weight: 500;">${new Date().toUTCString()}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        
+                                        <p style="font-size: 14px; color: #e53e3e; background-color: #fff5f5; padding: 12px; border-radius: 6px; border-left: 4px solid #f56565;">
+                                            <strong>Not you?</strong> If you did not initiate this sign-in, please <a href="http://sites.local:3000/support" style="color: #e53e3e; text-decoration: underline;">contact our support team</a> immediately to secure your account.
+                                        </p>
+                                        
+                                        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                                        <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 0;">Thank you for using Fiaxit 👻.</p>
+                                    </div>
+                                    <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 12px;">
+                                        &copy; ${new Date().getFullYear()} Fiaxit. All rights reserved.
+                                    </div>
+                                </div>
                             `
                         };
 
                         // Send the email
                         await transporter.sendMail(mailOptions, (error, info) => {
                             if (error) {
-                                console.log('Error sending email:', error);
+                                console.log('Error sending login notification email:', error);
                             } else {
-                                console.log('Email sent:', info.response);
+                                console.log('Login notification email sent:', info.response);
                             }
                         });
 

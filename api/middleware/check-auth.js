@@ -40,7 +40,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 const authenticate = async (req, res, next) => {
     try {
-        // Get token from authorization header
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({
@@ -50,128 +49,67 @@ const authenticate = async (req, res, next) => {
             });
         }
 
-        // Extract the token
         const token = authHeader.split(' ')[1];
 
-        // Check if token is blacklisted
+        // Check blacklist
         const isBlacklisted = await redisClient.get(`blacklist:${token}`);
         if (isBlacklisted) {
             return res.status(401).json({
                 success: false,
                 method: "authentication",
-                message: "Authentication failed: Token blacklisted (Token has been revoked) Please login again."
+                message: "Authentication failed: Token blacklisted."
             });
         }
 
-        // Verify the token
+        // Verify token
         const decoded = jwt.verify(token, process.env.JWT_KEY);
 
-        const user = await User.findOne({ // get user
-            where: {
-                user_id: decoded.user_id
-            }
-        })
+        // ALWAYS fetch fresh user from DB to ensure role/status are up to date
+        const user = await User.findOne({
+            where: { user_id: decoded.user_id }
+        });
 
         if (!user) {
             return res.status(401).json({
                 success: false,
                 method: "authentication",
-                message: "Authentication failed: User not found."
+                message: "Authentication failed: User no longer exists."
             });
         }
-        //return user;
 
-        // check if user in the kyc table and merge it to user
-        const userKyc = await UserKyc.findOne({ // get user
-            where: {
-                kyc_for: decoded.user_id
-            }
-        })
+        // Attach full DB user object to request
+        req.userData = user.toJSON();
+        req.token = token;
 
-        // if (userKyc) {
-        // merge userKyc to user
-        //     req.userData = { ...user, ...userKyc };
-        // }
-
-
-        // Attach user data to request
-        req.userData = decoded || user;
-        req.token = token; // Store token for potential use in other middleware/controllers
-
-        // Continue to the next middleware/router handler
         next();
     } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({
-                success: false,
-                method: "authentication",
-                message: "Authentication failed: Token expired. Please login again."
-            });
-        }
-
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({
-                success: false,
-                method: "authentication",
-                message: "Authentication failed: Invalid token. Please login again."
-            });
-        }
-
-        console.error('Authentication error:', error);
-        return res.status(500).json({
+        const msg = error.name === 'TokenExpiredError' ? "Token expired." : (error.name === 'JsonWebTokenError' ? "Invalid token." : "Authentication error.");
+        return res.status(401).json({
             success: false,
             method: "authentication",
-            message: 'Authentication failed: An error occurred while authenticating the user.',
-            error: error.message
+            message: `Authentication failed: ${msg}`,
+            details: error.message
         });
-    }
-};
-
-// Function to blacklist a token (not middleware)
-const blacklistToken = async (token) => {
-    try {
-        const decoded = jwt.decode(token);
-        if (decoded) {
-            // Calculate remaining time until token expiry
-            const expiryTime = decoded.exp - Math.floor(Date.now() / 1000);
-
-            if (expiryTime > 0) {
-                // Store token in blacklist until its original expiration time
-                await redisClient.set(`blacklist:${token}`, 'true', {
-                    EX: expiryTime
-                });
-
-                console.log(`Token blacklisted for ${expiryTime} seconds`);
-                return true;
-            }
-        }
-        console.error('Error blacklisting token: Token could not be decoded');
-        return false;
-    } catch (error) {
-        console.error('Error blacklisting token:', error);
-        return false;
     }
 };
 
 // Middleware to check if user is admin
 const isAdmin = async (req, res, next) => {
     try {
-        // req.userData is set by authenticate middleware
+        // req.userData is guaranteed to be the DB user object by authenticate middleware
         if (!req.userData || !req.userData.user_id) {
             return res.status(401).json({
                 success: false,
-                message: "Unauthorized: User data missing."
+                message: "Unauthorized: Access denied."
             });
         }
 
-        const user = await User.findOne({
-            where: { user_id: req.userData.user_id }
-        });
-
-        if (!user || user.user_role !== 'admin') {
+        if (req.userData.user_role !== 'admin') {
+            console.warn(`[AdminAccess] Denied for User ID: ${req.userData.user_id}, Email: ${req.userData.user_email}, Role: ${req.userData.user_role}`);
             return res.status(403).json({
                 success: false,
-                message: "Forbidden: Admin access required."
+                message: "Forbidden: Admin access required.",
+                debug: process.env.NODE_ENV === 'development' ? { role: req.userData.user_role } : undefined
             });
         }
 
@@ -183,6 +121,25 @@ const isAdmin = async (req, res, next) => {
             message: "Error verifying admin status.",
             error: error.message
         });
+    }
+};
+
+// Function to blacklist a token (not middleware)
+const blacklistToken = async (token) => {
+    try {
+        const decoded = jwt.decode(token);
+        if (decoded) {
+            const expiryTime = decoded.exp - Math.floor(Date.now() / 1000);
+            if (expiryTime > 0) {
+                await redisClient.set(`blacklist:${token}`, 'true', { EX: expiryTime });
+                console.log(`Token blacklisted for ${expiryTime} seconds`);
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error blacklisting token:', error);
+        return false;
     }
 };
 

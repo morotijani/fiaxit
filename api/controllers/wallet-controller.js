@@ -7,8 +7,69 @@ const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const { encrypt, decrypt } = require('../helpers/encryption'); // added
 const ethers = require('ethers');
 const { default: axios, head } = require("axios");
+const Transaction = require("../models/transaction-model");
 
 class WalletsController {
+
+    /**
+     * Internal helper to fetch wallet balance without HTTP overhead
+     */
+    _fetchBalanceInternal = async (address, symbol, userData) => {
+        if (!address) return 0;
+        try {
+            const cryptoSymbol = symbol.toUpperCase();
+            const coin = await Coin.findOne({ where: { coin_symbol: cryptoSymbol } });
+            const isTestnet = coin ? coin.coin_network !== 'mainnet' : (process.env.NODE_ENV !== 'production');
+
+            // Execute balance check logic directly
+            let rawData;
+            const resMock = {
+                status: () => resMock,
+                json: (payload) => { rawData = payload; }
+            };
+            const reqMock = { params: { crypto: symbol, address }, userData };
+
+            if (cryptoSymbol === 'BTC') {
+                await BitcoinWalletService.getWalletBalance(address, isTestnet)(reqMock, resMock);
+            } else if (cryptoSymbol === 'ETH' || (coin && (coin.coin_type === 'ETH' || coin.coin_type === 'ERC20'))) {
+                const network = (coin && coin.coin_network) ? coin.coin_network : (isTestnet ? 'sepolia' : 'mainnet');
+                EthereumWalletService.setNetwork(network);
+                await EthereumWalletService.getWalletBalance()(reqMock, resMock);
+            } else if (cryptoSymbol === 'USDT') {
+                await USDTService.getWalletBalance()(reqMock, resMock);
+            }
+
+            const body = rawData || {};
+            const payload = body.data ?? body.payload?.data ?? body.payload ?? body;
+
+            if (typeof payload === 'object' && payload !== null) {
+                const candidates = [
+                    payload?.balance?.total,
+                    payload?.balance?.btc,
+                    payload?.balanceEth,
+                    payload?.usdt?.balance,
+                    payload?.balance?.eth,
+                    payload?.balance,
+                    payload?.amount,
+                    payload?.value
+                ];
+                for (const c of candidates) {
+                    if (c !== undefined && c !== null) {
+                        const n = Number(c);
+                        if (!isNaN(n) && typeof c !== 'object') return n;
+                        if (typeof c === 'object' && c !== null) {
+                            const nt = Number(c.total ?? c.btc ?? c.balance ?? 0);
+                            if (!isNaN(nt)) return nt;
+                        }
+                    }
+                }
+            }
+            return 0;
+        } catch (err) {
+            console.warn(`Internal balance fetch failed for ${symbol} ${address}:`, err.message || err);
+            return 0;
+        }
+    };
 
     // get all wallets
     getAll = () => {
@@ -24,51 +85,9 @@ class WalletsController {
                     order: [['createdAt', 'DESC']]
                 });
 
-                // robust single-address fetcher with normalization and timeout
-                const fetchWalletBalance = async (address, symbol) => {
-                    if (!address) return 0;
-                    const token = req.headers.authorization?.split(' ')[1] || '';
-                    const url = `http://sites.local:8000/v1/wallets/${encodeURIComponent(symbol)}/${encodeURIComponent(address)}/balance`;
-                    try {
-                        const resp = await axios.get(url, {
-                            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                            timeout: 5000
-                        });
-                        const body = resp && resp.data ? resp.data : {};
-                        // support multiple shapes: { data: { ... } }, { payload: { data: { ... } } }, or direct
-                        const payload = body.data ?? body.payload?.data ?? body.payload ?? body;
-                        // Normalize common shapes
-                        if (symbol === 'ETH') {
-                            const val = payload?.balanceEth ?? payload?.balance ?? payload?.eth?.balance ?? payload?.balance?.eth;
-                            return Number(val ?? 0) || 0;
-                        }
-                        if (symbol === 'USDT') {
-                            const val = payload?.usdt?.balance ?? payload?.balance ?? payload?.balance?.usdt;
-                            return Number(val ?? 0) || 0;
-                        }
-                        if (symbol === 'BTC') {
-                            // btc might be nested under balance.btc or returned as btc
-                            const val = payload?.balance?.btc ?? payload?.balance ?? payload?.btc ?? payload?.btcBalance;
-                            // some services return strings; ensure numeric
-                            return Number(val ?? 0) || 0;
-                        }
-                        // generic fallback: try any numeric field
-                        if (typeof payload === 'object') {
-                            const candidates = [payload?.balance, payload?.amount, payload?.value, payload?.balanceEth];
-                            for (const c of candidates) {
-                                if (c !== undefined && c !== null && !isNaN(Number(c))) return Number(c);
-                            }
-                        }
-                        return 0;
-                    } catch (err) {
-                        console.warn(`Balance fetch failed for ${symbol} ${address}:`, err.message || err);
-                        return 0;
-                    }
-                };
-
                 // Fetch balances in parallel (guarded) and attach results
                 const settled = await Promise.allSettled(
-                    rows.map(w => fetchWalletBalance(w.wallet_address, w.wallet_symbol))
+                    rows.map(w => this._fetchBalanceInternal(w.wallet_address, w.wallet_symbol, req.userData))
                 );
 
                 for (let i = 0; i < rows.length; i++) {
@@ -241,8 +260,11 @@ class WalletsController {
                     });
                 }
 
+                const walletName = req.body.wallet_name || `Main ${cryptoSymbol} Wallet`;
+
                 const newWallet = await Wallet.create({
                     wallet_id: walletId,
+                    wallet_name: walletName,
                     wallet_for: userId,
                     wallet_symbol: cryptoSymbol,
                     wallet_crypto_name: walletCryptoName,
@@ -307,6 +329,68 @@ class WalletsController {
                 error: "There was a problem validating Ethereum wallet address.",
                 details: error.message || "An error occurred while validating the Ethereum wallet address",
             });
+        }
+    }
+
+    /**
+     * Unified Get Wallet Balance
+     */
+    getWalletBalance = () => {
+        return async (req, res, next) => {
+            try {
+                const { crypto, address } = req.params;
+                const cryptoSymbol = crypto.toUpperCase();
+
+                // 1. Fetch coin configuration to get network
+                const coin = await Coin.findOne({ where: { coin_symbol: cryptoSymbol } });
+                const isTestnet = coin ? coin.coin_network !== 'mainnet' : (process.env.NODE_ENV !== 'production');
+
+                // 2. Route to appropriate service
+                if (cryptoSymbol === 'BTC') {
+                    return BitcoinWalletService.getWalletBalance(address, isTestnet)(req, res, next);
+                } else if (cryptoSymbol === 'ETH' || (coin && coin.coin_type === 'ERC20')) {
+                    const network = (coin && coin.coin_network) ? coin.coin_network : (isTestnet ? 'sepolia' : 'mainnet');
+                    EthereumWalletService.setNetwork(network);
+                    return EthereumWalletService.getWalletBalance()(req, res, next);
+                } else if (cryptoSymbol === 'USDT') {
+                    return USDTService.getWalletBalance()(req, res, next);
+                }
+
+                res.status(400).json({ success: false, message: `Balance check not supported for ${cryptoSymbol}` });
+            } catch (err) {
+                console.error("getWalletBalance Error:", err);
+                res.status(500).json({ success: false, error: err.message });
+            }
+        }
+    }
+
+    /**
+     * Unified Get Wallet Info (Balance + History)
+     */
+    getWalletInfo = () => {
+        return async (req, res, next) => {
+            try {
+                const { crypto, address } = req.params;
+                const cryptoSymbol = crypto.toUpperCase();
+
+                const coin = await Coin.findOne({ where: { coin_symbol: cryptoSymbol } });
+                const isTestnet = coin ? coin.coin_network !== 'mainnet' : (process.env.NODE_ENV !== 'production');
+
+                if (cryptoSymbol === 'BTC') {
+                    return BitcoinWalletService.getWalletInfo(address, isTestnet)(req, res, next);
+                } else if (cryptoSymbol === 'ETH' || (coin && (coin.coin_type === 'ETH' || coin.coin_type === 'ERC20'))) {
+                    const network = (coin && coin.coin_network) ? coin.coin_network : (isTestnet ? 'sepolia' : 'mainnet');
+                    EthereumWalletService.setNetwork(network);
+                    return EthereumWalletService.getWalletInfo()(req, res, next);
+                } else if (cryptoSymbol === 'USDT') {
+                    return USDTService.getWalletInfo()(req, res, next);
+                }
+
+                res.status(400).json({ success: false, message: `Info retrieval not supported for ${cryptoSymbol}` });
+            } catch (err) {
+                console.error("getWalletInfo Error:", err);
+                res.status(500).json({ success: false, error: err.message });
+            }
         }
     }
 
@@ -443,32 +527,6 @@ class WalletsController {
     // get all wallet balance by using getAll function to loop through each wallet address and get their balance ad sum them together as one 
     getTotalBalance = () => {
         return async (req, res, next) => {
-            // helper: call middleware-style getWalletBalance and capture JSON response
-            const callMiddleware = async (service, address) => {
-                try {
-                    if (!service || typeof service.getWalletBalance !== 'function') return null;
-                    const mw = service.getWalletBalance();
-                    return await new Promise((resolve) => {
-                        const reqMock = { params: { address } };
-                        const resMock = {
-                            _status: 200,
-                            status(code) { this._status = code; return this; },
-                            json(payload) { resolve({ status: this._status || 200, payload }); }
-                        };
-                        try {
-                            const maybe = mw(reqMock, resMock);
-                            if (maybe && typeof maybe.then === 'function') {
-                                // middleware is async; it will resolve via resMock.json
-                            }
-                        } catch (e) {
-                            resolve({ status: 500, error: e });
-                        }
-                    });
-                } catch (err) {
-                    return { status: 500, error: err };
-                }
-            };
-
             // function to get rate of crypto using external service APIs
             const getCryptoRate = async (symbol, fiat) => {
                 symbol = symbol.toLowerCase() ?? '';
@@ -500,88 +558,24 @@ class WalletsController {
                 for (const wallet of wallets) {
                     const symbol = wallet.wallet_symbol;
                     const address = wallet.wallet_address;
-                    let numeric = 0;
 
-                    try {
-                        if (!address) {
-                            console.warn(`Skipping wallet with no address (symbol=${symbol})`);
-                            continue;
-                        }
-
-                        // ETH: prefer direct provider.getBalance
-                        if (symbol === 'ETH') {
-                            try {
-                                if (EthereumWalletService && EthereumWalletService.provider && typeof EthereumWalletService.provider.getBalance === 'function') {
-                                    const bal = await EthereumWalletService.provider.getBalance(address);
-                                    numeric = parseFloat(ethers.formatEther(bal)) || 0;
-                                } else {
-                                    const resp = await callMiddleware(EthereumWalletService, address);
-                                    const data = resp && resp.payload && resp.payload.data;
-                                    numeric = parseFloat(data?.balanceEth ?? data?.eth?.balance ?? data?.balance ?? 0) || 0;
-                                }
-                            } catch (e) {
-                                console.warn(`ETH balance fetch failed for ${address}:`, e.message);
-                                const resp = await callMiddleware(EthereumWalletService, address);
-                                const data = resp && resp.payload && resp.payload.data;
-                                numeric = parseFloat(data?.balanceEth ?? data?.eth?.balance ?? 0) || 0;
-                            }
-                        }
-
-                        // USDT: call USDT service middleware (or direct func if implemented)
-                        else if (symbol === 'USDT') {
-                            let resp;
-                            try {
-                                // Some services expose direct function; attempt it first
-                                if (typeof USDTService.getWalletBalance === 'function' && USDTService.getWalletBalance.length === 0) {
-                                    // if it's middleware-style, call via helper
-                                    resp = await callMiddleware(USDTService, address);
-                                } else {
-                                    resp = await callMiddleware(USDTService, address);
-                                }
-                            } catch (e) {
-                                resp = await callMiddleware(USDTService, address);
-                            }
-                            const data = resp && resp.payload && resp.payload.data;
-                            const flat = resp && resp.payload ? resp.payload : resp;
-                            numeric = parseFloat(data?.usdt?.balance ?? flat?.data?.usdt?.balance ?? flat?.data?.balance ?? 0) || 0;
-                        }
-
-                        // BTC: call Bitcoin middleware
-                        else if (symbol === 'BTC') {
-                            let resp;
-                            try {
-                                resp = await callMiddleware(BitcoinWalletService, address);
-                            } catch (e) {
-                                resp = await callMiddleware(BitcoinWalletService, address);
-                            }
-                            const data = resp && resp.payload && resp.payload.data;
-                            const flat = resp && resp.payload ? resp.payload : resp;
-                            // Bitcoin returns btc under data.balance.btc or data.balance.btc string
-                            numeric = parseFloat(data?.balance?.btc ?? flat?.data?.balance?.btc ?? flat?.data?.balance ?? 0) || 0;
-                        }
-
-                        // Fallback: try all services' middleware to find any numeric field
-                        else {
-                            const resp = await callMiddleware(EthereumWalletService, address) || await callMiddleware(USDTService, address) || await callMiddleware(BitcoinWalletService, address);
-                            const data = resp && resp.payload && resp.payload.data;
-                            numeric = parseFloat(data?.balance ?? data?.balanceEth ?? data?.usdt?.balance ?? 0) || 0;
-                        }
-                    } catch (innerErr) {
-                        console.error(`Error fetching balance for ${symbol} ${address}:`, innerErr && innerErr.message);
-                        numeric = 0;
-                    }
+                    const numeric = await this._fetchBalanceInternal(address, symbol, req.userData);
 
                     if (!totals[symbol]) {
                         totals[symbol] = {};
                     }
 
                     totals[symbol]['amount'] = (totals[symbol]['amount'] || 0) + numeric;
-                    totals[symbol]['name'] = wallet.wallet_crypto_name || null;
+                    totals[symbol]['name'] = (wallet.wallet_crypto_name || symbol).toLowerCase();
+
+                    // robust map for coingecko
+                    const COINGECKO_MAP = { eth: 'ethereum', btc: 'bitcoin', usdt: 'tether' };
+                    const rateId = COINGECKO_MAP[totals[symbol]['name']] || totals[symbol]['name'];
+
                     // Fetch and store fiat equivalent
-                    const rate = await getCryptoRate(totals[symbol]['name'], 'usd');
+                    const rate = await getCryptoRate(rateId, 'usd');
                     const fiatEquivalent = ((totals[symbol]['amount'] || 0) * rate);
                     totals[symbol]['fiat_equivalent'] = fiatEquivalent;
-
                 }
 
                 return res.status(200).json({

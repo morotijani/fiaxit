@@ -1,36 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const WalletsController = require("../controllers/wallet-controller");
-const BitcoinWalletService = require('../service/bitcoin-wallet-service');
-const USDTService = require('../service/usdt-service');
-const EthereumWalletService = require('../service/ethereum-wallet-service')
 
-// Usage (example): POST /api/v1/wallets/:crypto/generate?testnet=true(default is true) | (on ETH you can provide your network eg: ?network=networkname)
+// Usage (example): POST /api/v1/wallets/:crypto/generate
 router.post('/:crypto/generate', WalletsController.generateWallet()); // generate wallet address
 
+/** Unified Coin Info & Balance */
+// Usage: GET /api/v1/wallets/:crypto/:address/balance
+router.get('/:crypto/:address/balance', WalletsController.getWalletBalance());
+// Usage: GET /api/v1/wallets/:crypto/:address/info
+router.get('/:crypto/:address/info', WalletsController.getWalletInfo());
 
-/** USDT */
-// Usage (example): GET /api/v1/wallets/usdt/:address/balance?testnet=true (default is true)
-router.get('/usdt/:address/balance', USDTService.getWalletBalance()); // get usdt balance
-// Usage (example): GET /api/v1/wallets/usdt/:address/info?testnet=true (default is true)
-router.get('/usdt/:address/info', USDTService.getWalletInfo()); // get usdt wallet info
-
-
-/** BTC */
-// Usage (example): GET /api/v1/wallets/btc/:address/info?testnet=true
-router.get('/btc/:address/info', BitcoinWalletService.getWalletInfo()); // get btc wallet info
-// Usage (example): GET /api/v1/wallets/btc/:address/balance?testnet=true
-router.get('/btc/:address/balance', BitcoinWalletService.getWalletBalance()); // get btc balance
-
-
-/** ETH */ 
-// Usage (example): GET /api/v1/wallets/eth/:address/balance
-router.get('/eth/:address/balance', EthereumWalletService.getWalletBalance()); // get eth balance
-// Usage (example): GET /api/v1/wallets/eth/:address/info
-router.get('/eth/:address/info', EthereumWalletService.getWalletInfo()); // get eth wallet info
+/** ETH specific */
 // Usage (example): GET /api/v1/wallets/eth/:address/validate
 router.get('/eth/:address/validate', WalletsController.validateETHAddress); // validate eth address
-
 
 // get total balance
 router.get('/balance', WalletsController.getTotalBalance()); // get total balance of all wallets

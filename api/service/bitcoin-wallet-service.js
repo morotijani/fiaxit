@@ -14,7 +14,7 @@ class BitcoinWalletService {
 	constructor() {
 		// Default to testnet, can be changed to bitcoin.networks.bitcoin for mainnet
 		this.network = (process.env.NODE_ENV === 'production' ? bitcoin.networks.bitcoin : bitcoin.networks.testnet);
-		
+
 		// BlockCypher API endpoints
 		this.apiEndpoints = {
 			mainnet: 'https://api.blockcypher.com/v1/btc/main',
@@ -33,32 +33,35 @@ class BitcoinWalletService {
 
 			// Set network based on isTestnet
 			this.network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
-			
+			console.log('[BTC Service] Generating mnemonic...');
+
 			// Generate a random mnemonic (seed phrase)
 			const mnemonic = bip39.generateMnemonic();
-			
+
 			// Convert mnemonic to seed
 			const seed = bip39.mnemonicToSeedSync(mnemonic);
-			
+			console.log('[BTC Service] Creating root node from seed...');
+
 			// Create a root node from the seed
 			const root = bip32.fromSeed(seed, this.network);
-		  
+
 			// Derive the first account's node (m/44'/0'/0'/0/0)
 			const path = isTestnet ? "m/44'/1'/0'/0/0" : "m/44'/0'/0'/0/0";
+			console.log('[BTC Service] Deriving path:', path);
 			const child = root.derivePath(path);
-			
+
 			// Get the private key in WIF format
 			const privateKey = child.toWIF();
-			
+
 			// Create an ECPair from the child node's private key
 			const keyPair = ECPair.fromPrivateKey(child.privateKey, { network: this.network });
-		  
+
 			// Get the public key and create a P2PKH address
 			const { address } = bitcoin.payments.p2pkh({
 				pubkey: keyPair.publicKey,
 				network: this.network
-		  	});
-		  
+			});
+
 			return {
 				address,
 				privateKey,
@@ -66,8 +69,8 @@ class BitcoinWalletService {
 				network: isTestnet ? 'testnet' : 'mainnet'
 			};
 		} catch (error) {
-		  	console.error("Error generating Bitcoin wallet:", error);
-		  	throw new Error(`Failed to generate Bitcoin wallet: ${error.message}`);
+			console.error("Error generating Bitcoin wallet. Check step logs above.");
+			throw new Error(`Failed to generate Bitcoin wallet: ${error.message}`);
 		}
 	}
 
@@ -82,7 +85,7 @@ class BitcoinWalletService {
 	*/
 	async sendCrypto(
 		senderPrivateKey,
-		receiverAddress, 
+		receiverAddress,
 		amountToSend,
 		isTestnet
 	) {
@@ -101,7 +104,7 @@ class BitcoinWalletService {
 			if (!this.isValidBitcoinAddress(receiverAddress, isTestnet)) {
 				throw new Error("Invalid recipient Bitcoin address.");
 			}
-			
+
 			// Convert BTC to satoshis
 			const satoshiToSend = Math.round(amountToSend * 100000000);
 			if (satoshiToSend <= 0) {
@@ -111,58 +114,58 @@ class BitcoinWalletService {
 			// Import the private key with proper error handling
 			let keyPair;
 			try {
-			  	keyPair = ECPair.fromWIF(senderPrivateKey, this.network);
+				keyPair = ECPair.fromWIF(senderPrivateKey, this.network);
 			} catch (error) {
-			  	throw new Error(`Invalid private key: ${error.message}`);
+				throw new Error(`Invalid private key: ${error.message}`);
 			}
 
 			// Get the sender's address
 			const { address: fromAddress } = bitcoin.payments.p2pkh({
-				pubkey: keyPair.publicKey, 
-				network: this.network 
+				pubkey: keyPair.publicKey,
+				network: this.network
 			});
-			
+
 			console.log(`Sending from address: ${fromAddress}`);
 
 			// Set network-specific variables
-			const networkBaseUrl = isTestnet 
-				? "https://blockstream.info/testnet/api" 
+			const networkBaseUrl = isTestnet
+				? "https://blockstream.info/testnet/api"
 				: "https://blockstream.info/api";
-			
+
 			// Get UTXOs for the address
 			const utxoResponse = await axios({
-				method: "GET", 
-				url: `${networkBaseUrl}/address/${fromAddress}/utxo`, 
+				method: "GET",
+				url: `${networkBaseUrl}/address/${fromAddress}/utxo`,
 				timeout: 5000 // Add timeout for API calls
 			});
-			
+
 			if (!utxoResponse.data || utxoResponse.data.length === 0) {
 				throw new Error("No UTXOs found for this address");
 			}
-			
+
 			const utxos = utxoResponse.data;
 			let totalAmountAvailable = 0;
 			let inputs = [];
-			
+
 			// Process UTXOs 
 			// (UTXOs are the unspent output in transactions ( UTXO represents a certain amount of cryptocurrency that has been authorized by a sender and is available to be spent by a recipient.))
 			// getting balance on address
 			for (const utxo of utxos) {
 				inputs.push({
-					satoshis: utxo.value, 
-					script: bitcore.Script.buildPublicKeyHashOut(fromAddress).toHex(), 
-					address: fromAddress, 
-					txId: utxo.txid, 
+					satoshis: utxo.value,
+					script: bitcore.Script.buildPublicKeyHashOut(fromAddress).toHex(),
+					address: fromAddress,
+					txId: utxo.txid,
 					outputIndex: utxo.vout
 				});
 				totalAmountAvailable += utxo.value;
 			}
-			
+
 			// Calculate fee
 			const inputCount = inputs.length;
 			const outputCount = 2; // Recipient + change address
 			const transactionSize = inputCount * 180 + outputCount * 34 + 10 - inputCount;
-			
+
 			// Get fee rate - use fixed rate for testnet, dynamic for mainnet
 			let feeRate;
 			if (isTestnet) {
@@ -170,8 +173,8 @@ class BitcoinWalletService {
 			} else {
 				try {
 					const feeResponse = await axios.get(
-					"https://bitcoinfees.earn.com/api/v1/fees/recommended",
-					{ timeout: 5000 }
+						"https://bitcoinfees.earn.com/api/v1/fees/recommended",
+						{ timeout: 5000 }
 					);
 					feeRate = feeResponse.data.hourFee;
 				} catch (error) {
@@ -180,14 +183,14 @@ class BitcoinWalletService {
 					console.warn("Fee estimation API failed, using fallback fee rate:", error.message);
 				}
 			}
-			
+
 			const fee = Math.ceil(transactionSize * feeRate);
-			
+
 			// Check if we have enough funds
 			if (totalAmountAvailable - satoshiToSend - fee < 0) {
-				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable/100000000} BTC, Required: ${(satoshiToSend + fee)/100000000} BTC, Fee: ${fee/100000000} BTC.`);
+				throw new Error(`Insufficient balance. Available: ${totalAmountAvailable / 100000000} BTC, Required: ${(satoshiToSend + fee) / 100000000} BTC, Fee: ${fee / 100000000} BTC.`);
 			}
-			
+
 			// Create and sign transaction
 			const transaction = new bitcore.Transaction()
 				.from(inputs)
@@ -195,29 +198,29 @@ class BitcoinWalletService {
 				.change(fromAddress)
 				.fee(fee)
 				.sign(senderPrivateKey);
-			
+
 			// Verify transaction is valid
 			const isValid = transaction.isFullySigned();
 			if (!isValid) {
 				throw new Error("Transaction failed validation.");
 			}
-			
+
 			// Serialize and broadcast transaction 
 			// (send the transaction to the blockchIN)
 			const serializedTransaction = transaction.serialize();
-			
+
 			const broadcastResponse = await axios({
-				method: "POST", 
-				url: `${networkBaseUrl}/tx`, 
-				data: serializedTransaction, 
+				method: "POST",
+				url: `${networkBaseUrl}/tx`,
+				data: serializedTransaction,
 				timeout: 10000
 			});
-			
-			return { 
-				txid: broadcastResponse.data, 
-				senderWalletAddress: fromAddress 
+
+			return {
+				txid: broadcastResponse.data,
+				senderWalletAddress: fromAddress
 			};
-			
+
 		} catch (error) {
 			console.error("Bitcoin transaction error:", error.message);
 			return {
@@ -226,255 +229,124 @@ class BitcoinWalletService {
 			};
 		}
 	};
-	
-    // Get wallet balance
-    getWalletBalance = () => {
-        return async (req, res, next) => {
-            try {
-                const walletAddress = req.params.address;
-				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
-
-                if (!walletAddress) {
-                    return res.status(400).json({
-                        success: false, 
-                        error: "Wallet address is required"
-                    });
-                }
-                
-                // Validate Bitcoin address format
-                try {
-                    // This will throw an error if the address is invalid
-                    new bitcore.Address(walletAddress);
-                } catch (error) {
-                    return res.status(400).json({
-                        success: false, 
-                        error: "Invalid Bitcoin address format"
-                    });
-                }
-                
-                // Set network-specific variables
-                const networkBaseUrl = isTestnet 
-                    ? "https://blockstream.info/testnet/api" 
-                    : "https://blockstream.info/api";
-                
-                // Get UTXOs for the address
-                const utxoResponse = await axios({
-                    method: "GET",
-                    url: `${networkBaseUrl}/address/${walletAddress}/utxo`,
-                    timeout: 5000
-                });
-                
-                const utxos = utxoResponse.data || [];
-                
-                // Calculate total balance from UTXOs
-                let totalBalance = 0;
-                for (const utxo of utxos) {
-                    totalBalance += utxo.value;
-                }
-                
-                // Convert satoshis to BTC for easier reading
-                const balanceBTC = totalBalance / 100000000;
-                
-                // Format the response
-                res.status(200).json({
-                    success: true,
-                    method: "getBitcoinWalletBalance", 
-					message: `Successfully viewed Bitcoin wallet balance for ${walletAddress}`, 
-                    data: {
-                        address: walletAddress,
-                        network: isTestnet ? 'testnet' : 'mainnet',
-                        balance: {
-                            satoshis: totalBalance,
-                            btc: balanceBTC.toFixed(8)
-                        },
-                        utxos: {
-                            count: utxos.length,
-                            details: utxos.map(utxo => ({
-                                txid: utxo.txid,
-                                vout: utxo.vout,
-                                value: utxo.value,
-                                status: utxo.status
-                            }))
-                        }
-                    }
-                });
-            } catch(error) {
-                console.error("Wallet balance error:", error);
-                res.status(500).json({
-                    success: false, 
-					method: "getBitcoinWalletBalance", 
-                    error: "An error occurred while fetching wallet balance.", 
-					details: `Failed to get Bitcoin wallet balance: ${error.message}`
-                });
-            }
-        }
-    }
 
 	/**
-	   * Get Bitcoin wallet information
-	   * @param {string} address - Bitcoin address
-	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
-	   * @returns {Promise<Object>} Wallet information
+	   * Get Bitcoin wallet balance
 	*/
-
-	getWalletInfo = () => {
+	getWalletBalance = (addressParam, isTestnetParam) => {
 		return async (req, res, next) => {
 			try {
-				const address = req.params.address;
-				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
-				if (!address) {
-					return res.status(400).json({
-						success: false, 
-						method: "getBitcoinWalletInfo", 
-						error: "Bitcoin Wallet address is required."
-					});
-				}
+				const address = addressParam || req.params.address;
+				const isTestnet = isTestnetParam !== undefined ? isTestnetParam : (process.env.NODE_ENV === 'production' ? false : true);
+				const networkBaseUrl = isTestnet ? "https://blockstream.info/testnet/api" : "https://blockstream.info/api";
 
-				// Validate Bitcoin address
-				if (!this.isValidBitcoinAddress(address, isTestnet)) {
-					return res.status(400).json({
-						success: false, 
-						method: "getBitcoinWalletInfo", 
-						error: "Invalid Bitcoin wallet address."
-					});
-				}
-				
-				const network = isTestnet ? 'testnet' : 'mainnet';
-				const apiUrl = `${this.apiEndpoints[network]}/addrs/${address}`;
-				const maxAttempts = 3;
-				let data = {};
-				let txsData = {};
-				let lastError = null;
+				const response = await axios.get(`${networkBaseUrl}/address/${address}`, { timeout: 7000 });
+				const data = response.data || {};
+				const chainStats = data.chain_stats || {};
+				const mempoolStats = data.mempool_stats || {};
 
-				// Retry logic for address info
-				for (let attempt = 0; attempt < maxAttempts; attempt++) {
-					try {
-						const response = await axios.get(apiUrl, { timeout: 7000 });
-						data = response.data || {};
-						break;
-					} catch (err) {
-						lastError = err;
-						if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+				const confirmed = (chainStats.funded_txo_sum || 0) - (chainStats.spent_txo_sum || 0);
+				const unconfirmed = (mempoolStats.funded_txo_sum || 0) - (mempoolStats.spent_txo_sum || 0);
+				const total = confirmed + unconfirmed;
+
+				const result = {
+					address,
+					network: isTestnet ? 'testnet' : 'mainnet',
+					balance: {
+						confirmed: confirmed / 100000000,
+						unconfirmed: unconfirmed / 100000000,
+						total: (total / 100000000).toFixed(8),
+						satoshis: total
 					}
-				}
+				};
 
-				// Retry logic for transactions
-				for (let attempt = 0; attempt < maxAttempts; attempt++) {
-					try {
-						const txsUrl = `${apiUrl}/full?limit=20`;
-						const txsResponse = await axios.get(txsUrl, { timeout: 7000 });
-						txsData = txsResponse.data || {};
-						break;
-					} catch (err) {
-						lastError = err;
-						if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-					}
-				}
-
-				// Defensive checks and formatting
-				const transactions = Array.isArray(txsData.txs) ? txsData.txs.map(tx => {
-					let type = 'unknown';
-					let amount = 0;
-
-					const isInput = Array.isArray(tx.inputs) && tx.inputs.some(input => 
-						Array.isArray(input.addresses) && input.addresses.includes(address)
-					);
-
-					const isOutput = Array.isArray(tx.outputs) && tx.outputs.some(output => 
-						Array.isArray(output.addresses) && output.addresses.includes(address)
-					);
-
-					if (isInput && isOutput) {
-						type = 'self';
-						const totalOut = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && !output.addresses.includes(address)) {
-								return sum + (output.value || 0);
-							}
-							return sum;
-						}, 0);
-						amount = -totalOut;
-					} else if (isInput) {
-						type = 'sent';
-						const totalOut = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && !output.addresses.includes(address)) {
-								return sum + (output.value || 0);
-							}
-							return sum;
-						}, 0);
-						amount = -totalOut;
-					} else if (isOutput) {
-						type = 'received';
-						amount = tx.outputs.reduce((sum, output) => {
-							if (Array.isArray(output.addresses) && output.addresses.includes(address)) {
-								return sum + (output.value || 0);
-							}
-							return sum;
-						}, 0);
-					}
-
-					amount = amount / 100000000;
-
-					return {
-						txid: tx.hash || "",
-						type,
-						amount,
-						fee: tx.fees ? tx.fees / 100000000 : 0,
-						confirmations: tx.confirmations || 0,
-						blockHeight: tx.block_height || null,
-						timestamp: tx.received ? new Date(tx.received).toISOString() : null,
-						inputs: Array.isArray(tx.inputs) ? tx.inputs.map(input => ({
-							addresses: input.addresses || [],
-							value: input.output_value ? input.output_value / 100000000 : 0
-						})) : [],
-						outputs: Array.isArray(tx.outputs) ? tx.outputs.map(output => ({
-							addresses: output.addresses || [],
-							value: output.value ? output.value / 100000000 : 0
-						})) : []
-					};
-				}) : [];
-
-				res.status(200).json({
-					success: true, 
-					method: "getBitcoinWalletInfo", 
-					message: `Successfully listed Bitcoin wallet info for ${address}`, 
-					data: {
-						address, 
-						network, 
-						balance: {
-							confirmed: (data.balance || 0) / 100000000,
-							unconfirmed: (data.unconfirmed_balance || 0) / 100000000,
-							total: ((data.balance || 0) + (data.unconfirmed_balance || 0)) / 100000000
-						}, 
-						transactions,
-						txCount: data.n_tx || 0,
-						totalReceived: (data.total_received || 0) / 100000000,
-						totalSent: (data.total_sent || 0) / 100000000,
-						lastUpdated: new Date().toISOString()
-					}
-				});
+				if (res) return res.status(200).json({ success: true, data: result });
+				return result;
 			} catch (error) {
-				console.error("Error getting Bitcoin wallet info:", error);
-			 res.status(422).json({
-					success: false, 
-					method: "getBitcoinWalletInfo", 
-					error: "Failed to get Bitcoin wallet info.", 
-					details: error.message || "An error occurred while fetching Bitcoin wallet balance."
-				});
+				if (res) return res.status(500).json({ success: false, error: error.message });
+				throw error;
 			}
 		}
 	}
 
 	/**
-	   * Validate a Bitcoin address
-	   * @param {string} address - Bitcoin address to validate
-	   * @param {boolean} isTestnet - Whether to use testnet (true) or mainnet (false)
-	   * @returns {boolean} Whether the address is valid
+	   * Get Bitcoin wallet information including transactions
 	*/
+	getWalletInfo = (addressParam, isTestnetParam) => {
+		return async (req, res, next) => {
+			try {
+				const address = addressParam || req.params.address;
+				const isTestnet = isTestnetParam !== undefined ? isTestnetParam : (process.env.NODE_ENV === 'production' ? false : true);
+				const networkBaseUrl = isTestnet ? "https://blockstream.info/testnet/api" : "https://blockstream.info/api";
+
+				const [addrResp, txsResp] = await Promise.all([
+					axios.get(`${networkBaseUrl}/address/${address}`, { timeout: 7000 }),
+					axios.get(`${networkBaseUrl}/address/${address}/txs`, { timeout: 7000 })
+				]);
+
+				const addrData = addrResp.data || {};
+				const chainStats = addrData.chain_stats || {};
+				const mempoolStats = addrData.mempool_stats || {};
+
+				const confirmed = (chainStats.funded_txo_sum || 0) - (chainStats.spent_txo_sum || 0);
+				const unconfirmed = (mempoolStats.funded_txo_sum || 0) - (mempoolStats.spent_txo_sum || 0);
+				const total = confirmed + unconfirmed;
+
+				const txsData = Array.isArray(txsResp.data) ? txsResp.data : [];
+				const transactions = txsData.map(tx => {
+					let type = 'sent';
+					let amountSat = 0;
+
+					const addressOutputs = tx.vout.filter(out => out.scriptpubkey_address === address);
+					const isOutput = addressOutputs.length > 0;
+					const isInput = tx.vin.some(vin => vin.prevout && vin.prevout.scriptpubkey_address === address);
+
+					if (isInput && isOutput) {
+						type = 'self';
+						amountSat = tx.vout.reduce((sum, out) => out.scriptpubkey_address !== address ? sum + (out.value || 0) : sum, 0);
+					} else if (isInput) {
+						type = 'sent';
+						amountSat = tx.vout.reduce((sum, out) => out.scriptpubkey_address !== address ? sum + (out.value || 0) : sum, 0);
+					} else {
+						type = 'received';
+						amountSat = addressOutputs.reduce((sum, out) => sum + (out.value || 0), 0);
+					}
+
+					return {
+						txid: tx.txid,
+						type,
+						amount: amountSat / 100000000,
+						confirmations: tx.status && tx.status.confirmed ? 1 : 0,
+						timestamp: tx.status && tx.status.block_time ? new Date(tx.status.block_time * 1000).toISOString() : new Date().toISOString()
+					};
+				});
+
+				const result = {
+					address,
+					network: isTestnet ? 'testnet' : 'mainnet',
+					balance: {
+						confirmed: confirmed / 100000000,
+						unconfirmed: unconfirmed / 100000000,
+						total: total / 100000000
+					},
+					transactions,
+					txCount: (chainStats.tx_count || 0) + (mempoolStats.tx_count || 0),
+					totalReceived: (chainStats.funded_txo_sum || 0) / 100000000,
+					totalSent: (chainStats.spent_txo_sum || 0) / 100000000
+				};
+
+				if (res) return res.status(200).json({ success: true, data: result });
+				return result;
+			} catch (error) {
+				if (res) return res.status(422).json({ success: false, error: error.message });
+				throw error;
+			}
+		}
+	}
+
 	isValidBitcoinAddress(address, isTestnet) {
 		try {
 			const network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
-		
-			// Try to decode the address
 			bitcoin.address.toOutputScript(address, network);
 			return true;
 		} catch (error) {
