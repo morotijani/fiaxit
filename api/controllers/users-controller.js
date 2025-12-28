@@ -144,33 +144,35 @@ class UsersController {
                 }
 
                 // send mail to user email to verify their account
+                const verifyUrl = `http://sites.local:3000/auth/verify/${userId}/${vericode}`;
                 const mailOptions = {
-                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,
+                    from: `"Fiaxit" <${process.env.EMAIL_USERNAME}>`,
                     to: req.body.email,
-                    subject: 'Verify your account',
+                    subject: 'Verify your Fiaxit Account',
                     html: `
-                        <h3>${req.body.fname},</h3>
-                        <p>Thank you for registering with Fiaxit 👻. 
-                        <!-- <br>
-                        // Your verification code is: <b>${vericode}</b>
-                        // <br><br>
-                        // Enter this code in the app to verify your account. This code expires in 5 minutes.
-                        // <br><br>
-                        // If you did not request the code, you can safely ignore this message. -->
-                        <br><br>
-                        Please click on the following link to verify your account: <a href="http://sites.local:8000/v1/auth/verify/${userId}/${vericode}" target="_blank">http://sites.local:8000/v1/auth/verify/${userId}/${vericode}</a>, or copy and paste the link into your browser's address bar. 
-                        <br>
-                        <br>
-                        BE: http://sites.local:8000/v1/auth/verify/${userId}/${vericode}
-                        <br>
-                        <br>
-                        UI: http://sites.local:3000/auth/verify/${userId}/${vericode}
-                        <br>
-                        <br>
-                        With love,
-                        <br>
-                        - Fiaxit 👻
-                        </p>
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                <h2 style="margin-top: 0; color: #1a202c;">Hello ${req.body.fname},</h2>
+                                <p style="font-size: 16px;">Welcome to Fiaxit! We're excited to have you on board. To get started, please verify your email address by clicking the button below:</p>
+                                
+                                <div style="text-align: center; margin: 35px 0;">
+                                    <a href="${verifyUrl}" style="background-color: #0d6efd; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Verify My Account</a>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #64748b;">This link will expire in <strong>15 minutes</strong> for your security.</p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                                
+                                <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">If you didn't create a Fiaxit account, you can safely ignore this email.</p>
+                                <p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">Or copy and paste this link: <br> <a href="${verifyUrl}" style="color: #0d6efd; word-break: break-all;">${verifyUrl}</a></p>
+                            </div>
+                            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 12px;">
+                                &copy; ${new Date().getFullYear()} Fiaxit. All rights reserved.
+                            </div>
+                        </div>
                     `
                 };
 
@@ -347,6 +349,7 @@ class UsersController {
                             return res.status(401).json({
                                 success: false,
                                 method: "login",
+                                path: "email",
                                 message: "User login failed: User not verified, please verify your account."
                             })
                         }
@@ -401,8 +404,8 @@ class UsersController {
                     return res.status(401).json({
                         success: false,
                         method: "userLogin",
-                        message: "User login failed: User not found.",
-                        path: "email"
+                        path: "email",
+                        message: "User login failed: User not found."
                     })
                 }
                 res.status(200).json(resp)
