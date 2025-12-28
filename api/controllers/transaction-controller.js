@@ -1,12 +1,14 @@
 const Transaction = require("../models/transaction-model");
 const Wallet = require("../models/wallet-model");
 const Coin = require("../models/coin-model");
+const User = require("../models/user-model");
 const { Op } = require('sequelize'); // Import the Op object
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service');
 const { decrypt } = require('../helpers/encryption');
 const NotificationController = require('./notification-controller');
+const emailHelper = require('../helpers/email-helper');
 
 class TransactionsController {
 
@@ -260,6 +262,49 @@ class TransactionsController {
                             `/transactions`
                         );
                     }
+
+                    // 6. Send Email Notifications (Async, don't await so we don't block response)
+                    (async () => {
+                        try {
+                            // Sender Email
+                            const sender = await User.findOne({ where: { user_id: userId } });
+                            if (sender && sender.user_email) {
+                                await emailHelper.sendMail({
+                                    to: sender.user_email,
+                                    subject: `Transaction Sent: ${amount} ${cryptoSymbol}`,
+                                    html: emailHelper.getTransactionTemplate(
+                                        sender.user_fname,
+                                        amount,
+                                        cryptoSymbol,
+                                        'send',
+                                        receiverWalletAddress,
+                                        result.txid
+                                    )
+                                });
+                            }
+
+                            // Receiver Email (if internal)
+                            if (to_id) {
+                                const receiver = await User.findOne({ where: { user_id: to_id } });
+                                if (receiver && receiver.user_email) {
+                                    await emailHelper.sendMail({
+                                        to: receiver.user_email,
+                                        subject: `Transaction Received: ${amount} ${cryptoSymbol}`,
+                                        html: emailHelper.getTransactionTemplate(
+                                            receiver.user_fname,
+                                            amount,
+                                            cryptoSymbol,
+                                            'receive',
+                                            result.senderWalletAddress,
+                                            result.txid
+                                        )
+                                    });
+                                }
+                            }
+                        } catch (emailErr) {
+                            console.error('[TransactionsController] Email notification failed:', emailErr);
+                        }
+                    })();
 
                     res.status(201).json({
                         success: true,

@@ -8,27 +8,8 @@ const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 const { Op } = require('sequelize');
 const { timeStamp } = require('console');
+const emailHelper = require('../helpers/email-helper');
 
-
-// Configure email transporter
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: true, // true for port 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD
-    }
-});
-
-// Verify SMTP connection
-transporter.verify((error, success) => {
-    if (error) {
-        console.log('SMTP server connection error:', error);
-    } else {
-        console.log('SMTP server connection successful');
-    }
-});
 
 // Store verification codes temporarily (in production, use Redis or similar)
 const verificationCodes = new Map();
@@ -176,14 +157,8 @@ class UsersController {
                     `
                 };
 
-                // Send the email
-                await transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.log('Error sending email:', error);
-                    } else {
-                        console.log('Email sent:', info.response);
-                    }
-                });
+                // Send the email using the helper
+                await emailHelper.sendMail(mailOptions).catch(err => console.error('Signup email error:', err));
 
                 res.status(200).json({
                     success: true,
@@ -312,13 +287,7 @@ class UsersController {
                     `
                 };
 
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.log('Error sending welcome email:', error);
-                    } else {
-                        console.log('Welcome email sent:', info.response);
-                    }
-                });
+                await emailHelper.sendMail(mailOptions).catch(err => console.error('Welcome email error:', err));
 
                 res.status(200).json({
                     success: true,
@@ -431,14 +400,8 @@ class UsersController {
                             `
                         };
 
-                        // Send the email
-                        await transporter.sendMail(mailOptions, (error, info) => {
-                            if (error) {
-                                console.log('Error sending login notification email:', error);
-                            } else {
-                                console.log('Login notification email sent:', info.response);
-                            }
-                        });
+                        // Send the email notification
+                        await emailHelper.sendMail(mailOptions).catch(err => console.error('Login email error:', err));
 
                         resp.success = true;
                         resp.method = "userLogin";
@@ -557,24 +520,22 @@ class UsersController {
                     `
                 };
 
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.log('Email sending error:', error);
-                        return res.status(500).json({
-                            success: false,
-                            method: "resendVericode",
-                            message: "Resend verification failed: Email sending error."
-                        });
-                    } else {
-                        console.log('Verification email resent:', info.response);
-                        return res.status(200).json({
-                            success: true,
-                            method: "resendVericode",
-                            message: "Verification link sent successfully.",
-                            timeStamp: new Date().toISOString()
-                        });
-                    }
-                });
+                try {
+                    await emailHelper.sendMail(mailOptions);
+                    return res.status(200).json({
+                        success: true,
+                        method: "resendVericode",
+                        message: "Verification link sent successfully.",
+                        timeStamp: new Date().toISOString()
+                    });
+                } catch (error) {
+                    console.log('Resend email error:', error);
+                    return res.status(500).json({
+                        success: false,
+                        method: "resendVericode",
+                        message: "Resend verification failed: Email sending error."
+                    });
+                }
             } catch (error) {
                 console.error('Error in resend verification code:', error);
                 return res.status(500).json({
