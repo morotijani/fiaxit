@@ -3,25 +3,25 @@ const ethers = require("ethers");
 // USDT ERC-20 Contract ABI (Only the functions we need)
 const USDT_ABI = [
     {
-        "constant": true, 
-        "inputs": [{"name": "_owner", "type": "address"}], 
-        "name": "balanceOf", 
-        "outputs": [{"name": "balance", "type": "uint256"}], 
+        "constant": true,
+        "inputs": [{ "name": "_owner", "type": "address" }],
+        "name": "balanceOf",
+        "outputs": [{ "name": "balance", "type": "uint256" }],
         "type": "function"
     }, {
-        "constant": false, 
-        "inputs":[
-            {"name": "_to", "type": "address"}, 
-            {"name": "_value", "type": "uint256"}
+        "constant": false,
+        "inputs": [
+            { "name": "_to", "type": "address" },
+            { "name": "_value", "type": "uint256" }
         ],
-        "name": "transfer", 
-        "outputs": [{"name": "", "type": "bool"}], 
+        "name": "transfer",
+        "outputs": [{ "name": "", "type": "bool" }],
         "type": "function"
     }, {
-        "constant": true, 
-        "inputs": [], 
-        "name": "decimals", 
-        "outputs": [{"name": "", "type": "uint8"}], 
+        "constant": true,
+        "inputs": [],
+        "name": "decimals",
+        "outputs": [{ "name": "", "type": "uint8" }],
         "type": "function"
     }
 ];
@@ -35,15 +35,15 @@ const USDT_CONTRACT_ADDRESS = {
 // Infura or Alchemy endpoints with fallbacks
 const NETWORK_ENDPOINTS = {
     mainnet: [
-        process.env.ETH_MAINNET_ENDPOINT, 
-        "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
-        "https://eth-mainnet.g.alchemy.com/v2/demo", 
+        process.env.ETH_MAINNET_ENDPOINT,
+        "https://mainnet.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514",
+        "https://eth-mainnet.g.alchemy.com/v2/demo",
         "https://rpc.ankr.com/eth"
     ].filter(Boolean),
     sepolia: [
-        process.env.ETH_SEPOLIA_ENDPOINT, 
-        "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514", 
-        "https://eth-sepolia.g.alchemy.com/v2/demo", 
+        process.env.ETH_SEPOLIA_ENDPOINT,
+        "https://sepolia.infura.io/v3/2e3b84a24d1646f199566a2fb6c1e514",
+        "https://eth-sepolia.g.alchemy.com/v2/demo",
         "https://rpc.sepolia.org"
     ].filter(Boolean)
 };
@@ -55,12 +55,12 @@ const NETWORK_ENDPOINTS = {
 */
 async function createProvider(network) {
     const endpoints = NETWORK_ENDPOINTS[network];
-    
+
     // Try each endpoint until one works
     for (const endpoint of endpoints) {
         try {
             const provider = new ethers.JsonRpcProvider(endpoint);
-            
+
             // Test the connection
             await provider.getBlockNumber();
             console.log(`Connected to ${network} using ${endpoint}.`);
@@ -70,7 +70,7 @@ async function createProvider(network) {
             // Continue to the next endpoint
         }
     }
-    
+
     // If all endpoints fail, throw an error
     throw new Error(`Failed to connect to any ${network} endpoint.`);
 }
@@ -88,11 +88,11 @@ class USDTService {
             const wallet = ethers.Wallet.createRandom();
 
             return {
-                address: wallet.address, 
-                privateKey: wallet.privateKey, 
+                address: wallet.address,
+                privateKey: wallet.privateKey,
                 mnemonic: wallet.mnemonic.phrase
             }
-        } catch(error) {
+        } catch (error) {
             console.error("Error generating wallet:", error);
             throw new Error(`Failed to generate wallet: ${error.message}.`);
         }
@@ -105,29 +105,29 @@ class USDTService {
         * @returns {Promise<Object>} Balance information
     */
     getWalletBalance = () => {
-        return async(req, res, next) => {
+        return async (req, res, next) => {
             try {
                 const address = req.params.address;
                 const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
 
                 if (!address) {
                     return res.status(400).json({
-                        success: false, 
-                        method: "getUSDTBalance", 
+                        success: false,
+                        method: "getUSDTBalance",
                         error: "Address parameter is required."
                     });
                 }
 
                 if (!ethers.isAddress(address)) {
                     return res.status(400).json({
-                        success: false, 
-                        method: "getUSDTBalance", 
+                        success: false,
+                        method: "getUSDTBalance",
                         error: "Invalid Ethereum address."
                     });
                 }
 
                 const network = isTestnet ? "sepolia" : "mainnet";
-                
+
                 // Create provider with fallback mechanism
                 let provider;
                 try {
@@ -135,16 +135,16 @@ class USDTService {
                 } catch (error) {
                     return res.status(503).json({
                         success: false,
-                        method: "getUSDTBalance", 
-                        error: "Network connection failed.", 
+                        method: "getUSDTBalance",
+                        error: "Network connection failed.",
                         details: error.message
                     });
                 }
 
                 // Create USDT contract instance 
                 const usdtContract = new ethers.Contract(
-                    USDT_CONTRACT_ADDRESS[network], 
-                    USDT_ABI, 
+                    USDT_CONTRACT_ADDRESS[network],
+                    USDT_ABI,
                     provider
                 );
 
@@ -183,29 +183,29 @@ class USDTService {
                 }
 
                 res.status(200).json({
-                    success: true, 
-                    method: "getUSDTBalance", 
-                    message: `Successfully viewed USDT wallet balance for ${address}`, 
+                    success: true,
+                    method: "getUSDTBalance",
+                    message: `Successfully viewed USDT wallet balance for ${address}`,
                     data: {
-                        address, 
-                        network: isTestnet ? "sepolia" : "mainnet", 
+                        address,
+                        network: isTestnet ? "sepolia" : "mainnet",
                         usdt: {
-                            balance: balance, 
+                            balance: balance,
                             rawBalance: rawBalance.toString(), // Ensure BigInt is converted to string
                             decimals: decimals
-                        }, 
+                        },
                         eth: {
-                            balance: ethBalanceFormatted, 
+                            balance: ethBalanceFormatted,
                             rawBalance: ethBalance.toString() // Ensure BigInt is converted to string
                         }
                     }
                 });
-            } catch(error) {
+            } catch (error) {
                 console.error("Error getting USDT balance:", error);
                 res.status(500).json({
-                    success: false, 
-                    method: "getUSDTBalance", 
-                    error: "Failed to get USDT balance.", 
+                    success: false,
+                    method: "getUSDTBalance",
+                    error: "Failed to get USDT balance.",
                     details: error.message || "An error occurred while fetching USDT wallet balance."
                 });
             }
@@ -230,12 +230,12 @@ class USDTService {
     //         if (typeof senderPrivateKey !== 'string') {
     //             throw new Error("Private key must be a string");
     //         }
-            
+
     //         // Ensure private key has 0x prefix
     //         if (!senderPrivateKey.startsWith('0x')) {
     //             senderPrivateKey = '0x' + senderPrivateKey;
     //         }
-            
+
     //         // Validate private key format
     //         if (!/^0x[0-9a-fA-F]{64}$/.test(senderPrivateKey)) {
     //             throw new Error("Invalid private key format. Must be a 64-character hex string with 0x prefix.");
@@ -249,7 +249,7 @@ class USDTService {
 
     //         // Create provider with sender's private key 
     //         const provider = new ethers.JsonRpcProvider(NETWORK_ENDPOINTS[network]);
-            
+
     //         // Create wallet with validated private key
     //         let wallet;
     //         try {
@@ -257,7 +257,7 @@ class USDTService {
     //         } catch (error) {
     //             throw new Error(`Invalid private key: ${error.message}`);
     //         }
-        
+
     //         const senderAddress = wallet.address;
 
     //         // Create contract instance
@@ -275,7 +275,7 @@ class USDTService {
 
     //         // Check sender's USDT balance 
     //         const senderBalance = await usdtContract.balanceOf(senderAddress);
-            
+
     //         // In ethers v6, BigNumber methods are different
     //         if (senderBalance < amountInTokenUnits) {
     //             throw new Error(`Insufficient USDT balance. Available: ${ethers.formatUnits(senderBalance, decimals)}, Required: ${amount}`);
@@ -299,7 +299,7 @@ class USDTService {
 
     //         // Wait for transaction to be mined
     //         const receipt = await tx.wait();
-            
+
     //         return {
     //             success: true, 
     //             transactionHash: receipt.hash,
@@ -332,12 +332,12 @@ class USDTService {
             if (typeof senderPrivateKey !== 'string') {
                 throw new Error("Private key must be a string.");
             }
-            
+
             // Ensure private key has 0x prefix
             if (!senderPrivateKey.startsWith('0x')) {
                 senderPrivateKey = '0x' + senderPrivateKey;
             }
-            
+
             // Validate private key format
             if (!/^0x[0-9a-fA-F]{64}$/.test(senderPrivateKey)) {
                 throw new Error("Invalid private key format. Must be a 64-character hex string with 0x prefix.");
@@ -356,7 +356,7 @@ class USDTService {
             } catch (error) {
                 throw new Error(`Network connection failed: ${error.message}.`);
             }
-            
+
             // Create wallet with validated private key
             let wallet;
             try {
@@ -364,13 +364,13 @@ class USDTService {
             } catch (error) {
                 throw new Error(`Invalid private key: ${error.message}.`);
             }
-        
+
             const senderAddress = wallet.address;
 
             // Create contract instance
             const usdtContract = new ethers.Contract(
-                USDT_CONTRACT_ADDRESS[network], 
-                USDT_ABI, 
+                USDT_CONTRACT_ADDRESS[network],
+                USDT_ABI,
                 wallet
             );
 
@@ -385,8 +385,16 @@ class USDTService {
                 decimals = 6;
             }
 
+            // Truncate amount to token decimals to prevent parseUnits error
+            const truncateToDecimals = (val, dec) => {
+                const parts = val.toString().split(".");
+                if (parts.length < 2) return val.toString();
+                return parts[0] + "." + parts[1].substring(0, dec);
+            };
+            const sanitizedAmount = truncateToDecimals(amount, decimals);
+
             // Convert amount to token units (USDT typically has 6 decimals)
-            const amountInTokenUnits = ethers.parseUnits(amount.toString(), decimals);
+            const amountInTokenUnits = ethers.parseUnits(sanitizedAmount, decimals);
 
             // Check sender's USDT balance with error handling
             let senderBalance;
@@ -395,7 +403,7 @@ class USDTService {
             } catch (error) {
                 throw new Error(`Failed to get USDT balance: ${error.message}.`);
             }
-            
+
             // In ethers v6, BigNumber methods are different
             if (senderBalance < amountInTokenUnits) {
                 throw new Error(`Insufficient USDT balance. Available: ${ethers.formatUnits(senderBalance, decimals)}, Required: ${amount}`);
@@ -405,7 +413,7 @@ class USDTService {
             let ethBalance, gasPrice, gasCost;
             try {
                 ethBalance = await provider.getBalance(senderAddress);
-                
+
                 // Get gas price with fallback
                 try {
                     const feeData = await provider.getFeeData();
@@ -414,7 +422,7 @@ class USDTService {
                     console.warn("Failed to get gas price, using default:", error.message);
                     gasPrice = ethers.parseUnits("50", "gwei");
                 }
-                
+
                 const gasLimit = 100000n; // Estimated gas for ERC-20 transfers
                 gasCost = gasPrice * gasLimit;
             } catch (error) {
@@ -438,21 +446,21 @@ class USDTService {
             } catch (error) {
                 throw new Error(`Transaction failed: ${error.message}`);
             }
-            
+
             return {
-                success: true, 
+                success: true,
                 transactionHash: receipt.hash,
                 sender: senderAddress,
                 receiver: receiverAddress,
                 amount: amount,
-                network: network, 
+                network: network,
                 blockNumber: receipt.blockNumber ? receipt.blockNumber.toString() : null,
                 gasUsed: receipt.gasUsed ? receipt.gasUsed.toString() : null,
             }
-        } catch(error) {
+        } catch (error) {
             console.error("Error sending USDT:", error);
             return {
-                success: false, 
+                success: false,
                 error: "Failed to send USDT",
                 details: error.message
             }
@@ -469,34 +477,34 @@ class USDTService {
         return async (req, res, next) => {
             try {
                 const address = req.params.address;
-				const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
-                
+                const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
+
                 if (!address) {
                     return res.status(400).json({
-                        success: false, 
-                        method: "getUSDTWalletInfo", 
+                        success: false,
+                        method: "getUSDTWalletInfo",
                         error: "Address parameter is required."
                     });
                 }
 
                 if (!ethers.isAddress(address)) {
                     return res.status(400).json({
-                        success: false, 
-                        method: "getUSDTWalletInfo", 
+                        success: false,
+                        method: "getUSDTWalletInfo",
                         error: "Invalid Ethereum address."
                     });
                 }
 
                 const network = isTestnet ? "sepolia" : "mainnet";
-                
+
                 // Create provider with fallback mechanism
                 let provider;
                 try {
                     provider = await createProvider(network);
                 } catch (error) {
                     return res.status(503).json({
-                        success: false, 
-                        method: "getUSDTWalletInfo", 
+                        success: false,
+                        method: "getUSDTWalletInfo",
                         error: "Network connection failed.",
                         details: error.message
                     });
@@ -504,8 +512,8 @@ class USDTService {
 
                 // Create USDT contract instance 
                 const usdtContract = new ethers.Contract(
-                    USDT_CONTRACT_ADDRESS[network], 
-                    USDT_ABI, 
+                    USDT_CONTRACT_ADDRESS[network],
+                    USDT_ABI,
                     provider
                 );
 
@@ -522,7 +530,7 @@ class USDTService {
                         console.warn("Failed to get decimals, using default value of 6:", error.message);
                         decimals = 6;
                     }
-        
+
                     // Get raw balance with error handling
                     let rawBalance;
                     try {
@@ -531,13 +539,13 @@ class USDTService {
                         console.warn("Failed to get balance, using 0:", error.message);
                         rawBalance = 0n;
                     }
-        
+
                     // Convert to human-readable format 
                     const balance = ethers.formatUnits(rawBalance, decimals);
-                    
+
                     usdtBalance = {
-                        balance: balance, 
-                        rawBalance: rawBalance.toString(), 
+                        balance: balance,
+                        rawBalance: rawBalance.toString(),
                         decimals: decimals
                     };
                 } catch (error) {
@@ -566,7 +574,7 @@ class USDTService {
                 // Get recent transactions with error handling
                 let recentTransactions = [];
                 let usdtTransfers = [];
-                
+
                 try {
                     // Get block number with error handling
                     let blockNumber;
@@ -576,7 +584,7 @@ class USDTService {
                         console.warn("Failed to get block number:", error.message);
                         blockNumber = 0;
                     }
-                    
+
                     if (blockNumber > 0) {
                         // Safely get blocks with transactions
                         const recentBlocks = await Promise.all(
@@ -584,7 +592,7 @@ class USDTService {
                                 // Ensure we don't request negative block numbers
                                 const blockToFetch = blockNumber - i;
                                 if (blockToFetch < 0) return Promise.resolve(null);
-                                
+
                                 // Use getBlock with includeTransactions=true for ethers.js v6
                                 return provider.getBlock(blockToFetch, true)
                                     .catch(err => {
@@ -593,67 +601,67 @@ class USDTService {
                                     });
                             })
                         );
-            
+
                         // Filter out null blocks and process transactions
                         recentTransactions = recentBlocks
                             .filter(block => block !== null)
                             .flatMap(block => block.transactions || [])
                             .filter(tx => {
                                 // Ensure tx.from and tx.to exist before comparing
-                                return tx && tx.from && 
-                                    (tx.from.toLowerCase() === address.toLowerCase() || 
+                                return tx && tx.from &&
+                                    (tx.from.toLowerCase() === address.toLowerCase() ||
                                         (tx.to && tx.to.toLowerCase() === address.toLowerCase()));
                             })
                             .map(tx => {
                                 // Find the block that contains this transaction
                                 const txBlock = recentBlocks.find(b => b && b.number === tx.blockNumber);
-                                
+
                                 return {
-                                    hash: tx.hash, 
-                                    from: tx.from, 
-                                    to: tx.to || 'Contract Creation', 
-                                    value: ethers.formatEther(tx.value), 
-                                    timestamp: txBlock ? 
-                                        new Date(Number(txBlock.timestamp) * 1000).toISOString() : 
-                                        new Date().toISOString(), 
-                                    blockNumber: tx.blockNumber ? tx.blockNumber.toString() : null, 
-                                    gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : '0', 
-                                    gasLimit: tx.gasLimit ? tx.gasLimit.toString() : '0', 
+                                    hash: tx.hash,
+                                    from: tx.from,
+                                    to: tx.to || 'Contract Creation',
+                                    value: ethers.formatEther(tx.value),
+                                    timestamp: txBlock ?
+                                        new Date(Number(txBlock.timestamp) * 1000).toISOString() :
+                                        new Date().toISOString(),
+                                    blockNumber: tx.blockNumber ? tx.blockNumber.toString() : null,
+                                    gasPrice: tx.gasPrice ? ethers.formatUnits(tx.gasPrice, 'gwei') : '0',
+                                    gasLimit: tx.gasLimit ? tx.gasLimit.toString() : '0',
                                     nonce: tx.nonce ? tx.nonce.toString() : '0'
                                 };
                             })
                             .slice(0, 20); // Limit to 20 most recent transactions
-            
+
                         // Check for USDT transfers using logs
                         try {
                             const usdtContract = new ethers.Contract(
-                                USDT_CONTRACT_ADDRESS[network], 
+                                USDT_CONTRACT_ADDRESS[network],
                                 [
                                     "event Transfer(address indexed from, address indexed to, uint256 value)"
-                                ], 
+                                ],
                                 provider
                             );
-                            
+
                             // Look for transfers to/from this address in the last 10000 blocks
                             const fromBlock = Math.max(0, blockNumber - 10000);
-                            
+
                             // Create filters for sent and received transfers
                             const sentFilter = usdtContract.filters.Transfer(address, null);
                             const receivedFilter = usdtContract.filters.Transfer(null, address);
-                            
+
                             // Query logs
                             const [sentLogs, receivedLogs] = await Promise.all([
                                 usdtContract.queryFilter(sentFilter, { fromBlock }).catch(() => []),
                                 usdtContract.queryFilter(receivedFilter, { fromBlock }).catch(() => [])
                             ]);
-                            
+
                             // Process logs
                             const allLogs = [...sentLogs, ...receivedLogs]
                                 .sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
-                                
+
                             for (const log of allLogs.slice(0, 20)) {
                                 const decimals = 6; // USDT typically has 6 decimals
-                                
+
                                 // Try to get the block for timestamp information
                                 let timestamp;
                                 try {
@@ -662,15 +670,15 @@ class USDTService {
                                 } catch (err) {
                                     timestamp = new Date().toISOString();
                                 }
-                                
+
                                 usdtTransfers.push({
-                                    hash: log.transactionHash, 
-                                    from: log.args.from, 
-                                    to: log.args.to, 
-                                    value: ethers.formatUnits(log.args.value, decimals), 
-                                    type: log.args.from.toLowerCase() === address.toLowerCase() ? 'sent' : 'received', 
-                                    token: 'USDT', 
-                                    blockNumber: log.blockNumber, 
+                                    hash: log.transactionHash,
+                                    from: log.args.from,
+                                    to: log.args.to,
+                                    value: ethers.formatUnits(log.args.value, decimals),
+                                    type: log.args.from.toLowerCase() === address.toLowerCase() ? 'sent' : 'received',
+                                    token: 'USDT',
+                                    blockNumber: log.blockNumber,
                                     timestamp: timestamp
                                 });
                             }
@@ -687,37 +695,37 @@ class USDTService {
                 // Get token balances
                 const tokenBalances = [];
                 tokenBalances.push({
-                    token: 'USDT', 
-                    balance: usdtBalance.balance, 
-                    rawBalance: usdtBalance.rawBalance, 
-                    decimals: usdtBalance.decimals 
+                    token: 'USDT',
+                    balance: usdtBalance.balance,
+                    rawBalance: usdtBalance.rawBalance,
+                    decimals: usdtBalance.decimals
                 });
 
                 res.status(200).json({
-                    success: true, 
-                    method: "getUSDTWalletInfo", 
-                    message: `Successfully listed USDT wallet info for ${address}`, 
+                    success: true,
+                    method: "getUSDTWalletInfo",
+                    message: `Successfully listed USDT wallet info for ${address}`,
                     data: {
-                        address, 
-                        network: isTestnet ? "sepolia" : "mainnet", 
-                        usdt: usdtBalance, 
+                        address,
+                        network: isTestnet ? "sepolia" : "mainnet",
+                        usdt: usdtBalance,
                         eth: {
-                            balance: ethers.formatEther(ethBalance), 
-                            rawBalance: ethBalance.toString() 
-                        }, 
-                        txCount: txCount.toString(), 
-                        recentTransactions: recentTransactions, 
-                        usdtTransfers: usdtTransfers, 
-                        tokenBalances: tokenBalances, 
+                            balance: ethers.formatEther(ethBalance),
+                            rawBalance: ethBalance.toString()
+                        },
+                        txCount: txCount.toString(),
+                        recentTransactions: recentTransactions,
+                        usdtTransfers: usdtTransfers,
+                        tokenBalances: tokenBalances,
                         lastUpdated: new Date().toISOString()
                     }
                 });
 
-            } catch(error) {
+            } catch (error) {
                 console.error("Error getting wallet info:", error);
                 res.status(500).json({
-                    success: false, 
-                    method: "getUSDTWalletInfo", 
+                    success: false,
+                    method: "getUSDTWalletInfo",
                     error: "Failed to get wallet info.",
                     details: error.message
                 });
