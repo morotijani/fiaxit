@@ -9,6 +9,7 @@ const walletRoutes = require('./api/routes/wallets');
 const tradeRoutes = require('./api/routes/trade');
 const coverterRoutes = require('./api/routes/convert');
 const coinRoutes = require('./api/routes/coins');
+const notificationRoutes = require('./api/routes/notifications');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const { authenticate } = require('./api/middleware/check-auth');
@@ -38,6 +39,7 @@ app.use('/v1/transactions', authenticate, transactionRoutes);
 app.use('/v1/trade', authenticate, tradeRoutes);
 app.use('/v1/convert', coverterRoutes);
 app.use('/v1/coins', coinRoutes);
+app.use('/v1/notifications', authenticate, notificationRoutes);
 
 // Error handling
 app.use((req, res, next) => {

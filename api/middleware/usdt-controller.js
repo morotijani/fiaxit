@@ -1,4 +1,7 @@
 const USDTService = require('../service/usdt-service');
+const Wallet = require("../models/wallet-model");
+const Coin = require("../models/coin-model");
+const { decrypt } = require('../helpers/encryption');
 
 class USDTController {
 
@@ -8,50 +11,58 @@ class USDTController {
     sendUSDT = () => {
         return async (req, res) => {
             try {
-                const { senderPrivateKey, receiverAddress, amount } = req.body;
-                const isTestnet = req.query.testnet !== 'false'; // Default to testnet=true
-                
+                const userId = req.userData.user_id;
+                const { crypto_id, toAddress, amount } = req.body;
+
                 // Validate required fields
-                if (!senderPrivateKey || !receiverAddress || !amount) {
+                if (!crypto_id || !toAddress || !amount) {
                     return res.status(400).json({
                         success: false,
-                        error: "Missing required parameters: senderPrivateKey, receiverAddress, and amount are required"
+                        error: "Missing required parameters: crypto_id, toAddress, and amount are required"
                     });
                 }
-                
-                // Validate private key format
-                let formattedPrivateKey = senderPrivateKey;
-                
-                // Check if private key has the 0x prefix, add it if missing
+
+                // 1. Lookup the sender's wallet to get the private key safely
+                const senderWallet = await Wallet.findOne({
+                    where: {
+                        wallet_id: crypto_id,
+                        wallet_for: userId
+                    }
+                });
+
+                if (!senderWallet) {
+                    return res.status(404).json({
+                        success: false,
+                        error: "Sender wallet not found or unauthorized."
+                    });
+                }
+
+                // 2. Decrypt the private key internally
+                const senderRawKey = decrypt(senderWallet.wallet_privatekey);
+                if (!senderRawKey) {
+                    return res.status(500).json({
+                        success: false,
+                        error: "Failed to retrieve wallet keys."
+                    });
+                }
+
+                // Validate/Format private key (Ethereum/USDT style)
+                let formattedPrivateKey = senderRawKey;
                 if (!formattedPrivateKey.startsWith('0x')) {
                     formattedPrivateKey = '0x' + formattedPrivateKey;
                 }
-                
-                // Check if private key has the correct length (32 bytes = 64 hex chars + '0x' prefix = 66 chars)
-                if (formattedPrivateKey.length !== 66) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid private key format",
-                        details: "Private key must be 64 hexadecimal characters (32 bytes)"
-                    });
-                }
-                
-                // Check if private key contains only valid hex characters
-                if (!/^0x[0-9a-fA-F]{64}$/.test(formattedPrivateKey)) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid private key format",
-                        details: "Private key must contain only hexadecimal characters"
-                    });
-                }
-                
+
+                // 3. Determine network settings dynamically
+                const coin = await Coin.findOne({ where: { coin_symbol: 'USDT' } });
+                const isTestnet = coin ? (coin.coin_network !== 'mainnet') : (process.env.NODE_ENV !== 'production');
+
                 const result = await USDTService.SendUSDT(
                     formattedPrivateKey,
-                    receiverAddress,
+                    toAddress,
                     amount,
                     isTestnet
                 );
-                
+
                 if (!result.success) {
                     return res.status(400).json({
                         success: false,
@@ -59,7 +70,7 @@ class USDTController {
                         details: result.details
                     });
                 }
-                
+
                 res.status(200).json({
                     success: true,
                     method: "sendUSDT",

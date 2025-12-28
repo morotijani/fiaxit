@@ -1,9 +1,12 @@
 const Transaction = require("../models/transaction-model");
 const Wallet = require("../models/wallet-model");
+const Coin = require("../models/coin-model");
 const { Op } = require('sequelize'); // Import the Op object
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
-const EthereumWalletService = require('../service/ethereum-wallet-service')
+const EthereumWalletService = require('../service/ethereum-wallet-service');
+const { decrypt } = require('../helpers/encryption');
+const NotificationController = require('./notification-controller');
 
 class TransactionsController {
 
@@ -33,11 +36,11 @@ class TransactionsController {
                     data: rows,
                     total: count
                 })
-            } catch(err) {
+            } catch (err) {
                 res.status(422).json({
-                    success: false, 
-                    method: "getAllTransactions", 
-                    message: "An error occurred, please try again.", 
+                    success: false,
+                    method: "getAllTransactions",
+                    message: "An error occurred, please try again.",
                     details: err.error
                 })
             }
@@ -52,14 +55,14 @@ class TransactionsController {
 
             const transaction = await Transaction.findOne({
                 where: {
-                    transaction_id: transactionId, 
+                    transaction_id: transactionId,
                     transaction_by: userId
                 }
             })
             const resp = {
                 success: false,
-                method: "findById", 
-                msg: "Transaction not found!", 
+                method: "findById",
+                msg: "Transaction not found!",
                 data: {
                     transaction: null
                 }
@@ -80,48 +83,77 @@ class TransactionsController {
     create = () => {
         return async (req, res, next) => {
             try {
-                const isTestnet = (process.env.NODE_ENV === 'production' ? false : true);
                 const userId = req.userData.user_id;
                 const transactionId = uuidv4();
-                const transactionStatus = 'Pending';
+                let transactionStatus = 'Pending';
                 const cryptoSymbol = req.body.crypto_symbol
                 const amount = req.body.amount;
-                const senderPrivateKey = req.body.privateKey
-                const receiverWalletAddress = req.body.toAddress 
+                const receiverWalletAddress = req.body.toAddress
                 const feeRate = req.body.feeRate || 10 // 0.0001 (if rate fee is not set)
-                
+                const walletId = req.body.crypto_id;
+
                 // validate required fields
-                const requiredFields = ['amount', 'crypto_symbol', 'toAddress', 'privateKey'];
+                const requiredFields = ['amount', 'crypto_symbol', 'toAddress', 'crypto_id'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
-                            success: false, 
-                            method: "createAndSend" + cryptoSymbol, 
+                            success: false,
+                            method: "createAndSend" + cryptoSymbol,
                             path: field,
                             error: `Missing required field: ${field}`
                         });
                     }
                 }
 
+                // 1. Lookup the sender's wallet to get the private key safely
+                const senderWallet = await Wallet.findOne({
+                    where: {
+                        wallet_id: walletId,
+                        wallet_for: userId
+                    }
+                });
+
+                if (!senderWallet) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "createAndSend" + cryptoSymbol,
+                        error: "Sender wallet not found or unauthorized."
+                    });
+                }
+
+                // 2. Decrypt the private key internally
+                const senderPrivateKey = decrypt(senderWallet.wallet_privatekey);
+                if (!senderPrivateKey) {
+                    return res.status(500).json({
+                        success: false,
+                        method: "createAndSend" + cryptoSymbol,
+                        error: "Failed to retrieve wallet keys."
+                    });
+                }
+
+                // 3. Determine network settings dynamically
+                const coin = await Coin.findOne({ where: { coin_symbol: cryptoSymbol.toUpperCase() } });
+                const isTestnet = coin ? (coin.coin_network !== 'mainnet') : (process.env.NODE_ENV !== 'production');
+
                 let result;
                 if (cryptoSymbol === 'BTC') {
                     result = await BitcoinWalletService.sendCrypto(
-                        senderPrivateKey, 
-                        receiverWalletAddress, 
-                        amount, 
-                        feeRate, 
-                        isTestnet 
+                        senderPrivateKey,
+                        receiverWalletAddress,
+                        amount,
+                        feeRate,
+                        isTestnet
                     );
-                    
+
                     if (result.txid) {
                         console.log('Bitcoin Transaction sent successfully:', result.txid);
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
                         res.status(422).json({
-                            success: false, 
-                            method: "createAndSend" + cryptoSymbol, 
-                            message: "Bitcoin Transaction failed", 
-                            result: result.error, 
+                            success: false,
+                            method: "createAndSend" + cryptoSymbol,
+                            message: "Bitcoin Transaction failed",
+                            result: result.error,
                             details: result.details
                         });
                     }
@@ -136,26 +168,26 @@ class TransactionsController {
 
                         // Then speed it up with a 50% higher fee
                         result = await EthereumWalletService.speedUpTransaction(
-                            senderPrivateKey, 
-                            pendingNonce, 
-                            receiverWalletAddress, 
-                            amount, 
+                            senderPrivateKey,
+                            pendingNonce,
+                            receiverWalletAddress,
+                            amount,
                             higherFee
                         );
-                    } else { 
+                    } else {
                         // use normal legacy transaction speed
                         result = await EthereumWalletService.sendEther(senderPrivateKey, receiverWalletAddress, amount)
                     }
-                    
+
                     if (result.txid) {
                         console.log('Ethereum Transaction send successfully:', result.txid)
                         console.log('result:', result)
                     } else {
                         console.error('Transaction failed:', result.error, result.details);
                         res.status(422).json({
-                            success: false, 
+                            success: false,
                             method: "createAndSend" + cryptoSymbol,
-                            message: "Ethereum Transaction failed", 
+                            message: "Ethereum Transaction failed",
                             result: result.error,
                             details: result.details
                         });
@@ -184,41 +216,65 @@ class TransactionsController {
                 if (to_id === userId) {
                     transactionType = 'receive';
                 }
-               
+
                 // save transaction to db
                 if (result && result.txid) {
                     transactionStatus = 'Completed';
                     const transaction = await Transaction.create({
-                        transaction_id: transactionId, 
+                        transaction_id: transactionId,
                         transaction_hash_id: result.txid,
-                        transaction_by: userId, 
-                        transaction_to: to_id, 
-                        transaction_amount: amount, 
-                        transaction_type: transactionType, 
-                        transaction_crypto_id: req.body.crypto_id, 
-                        transaction_crypto_symbol: cryptoSymbol, 
-                        transaction_crypto_name: req.body.crypto_name, 
-                        transaction_crypto_price: req.body.crypto_price, 
+                        transaction_by: userId,
+                        transaction_to: to_id,
+                        transaction_amount: amount,
+                        transaction_type: transactionType,
+                        transaction_crypto_id: req.body.crypto_id,
+                        transaction_crypto_symbol: cryptoSymbol,
+                        transaction_crypto_name: req.body.crypto_name,
+                        transaction_crypto_price: req.body.crypto_price,
                         transaction_from_wallet_address: result.senderWalletAddress,
-                        transaction_to_wallet_address: receiverWalletAddress, 
-                        transaction_message: req.body.note || null, 
+                        transaction_to_wallet_address: receiverWalletAddress,
+                        transaction_message: req.body.note || null,
                         transaction_status: transactionStatus
                     });
-                    
+
+                    // 4. Create Notification for Sender
+                    await NotificationController.createNotification(
+                        userId,
+                        'Transaction Sent',
+                        `Successfully sent ${amount} ${cryptoSymbol} to ${receiverWalletAddress.substring(0, 10)}...`,
+                        'success',
+                        transactionId,
+                        'transaction',
+                        `/transactions`
+                    );
+
+                    // 5. Create Notification for Receiver (if they are a user in our system)
+                    if (to_id) {
+                        await NotificationController.createNotification(
+                            to_id,
+                            'Transaction Received',
+                            `Received ${amount} ${cryptoSymbol} from ${result.senderWalletAddress.substring(0, 10)}...`,
+                            'info',
+                            transactionId,
+                            'transaction',
+                            `/transactions`
+                        );
+                    }
+
                     res.status(201).json({
                         success: true,
-                        method: "createAndSend" + cryptoSymbol, 
-                        transaction: transaction, 
+                        method: "createAndSend" + cryptoSymbol,
+                        transaction: transaction,
                         data: {
                             transaction: result
                         }
                     });
                 }
-            } catch(error) {
+            } catch (error) {
                 console.error("Transaction creation error:", error);
                 res.status(422).json({
                     success: false,
-                    error: "An error occurred during transaction creation", 
+                    error: "An error occurred during transaction creation",
                     details: error.message
                 });
             }
@@ -230,88 +286,88 @@ class TransactionsController {
         return async (req, res, next) => {
             // Start a database transaction for data integrity
             const dbTransaction = await Transaction.sequelize.transaction();
-            
+
             try {
                 const userId = req.userData.user_id;
                 const transactionId = req.params.id;
-                
+
                 // Find the transaction within the transaction context
                 const transaction = await Transaction.findOne({
                     where: {
-                        transaction_id: transactionId, 
+                        transaction_id: transactionId,
                         transaction_by: userId
                     },
                     transaction: dbTransaction
                 });
-                
+
                 if (!transaction) {
                     await dbTransaction.rollback();
                     return res.status(404).json({
-                        success: false, 
-                        method: "updateTransaction", 
+                        success: false,
+                        method: "updateTransaction",
                         message: "Transaction not found or you don't have permission to update it."
                     });
                 }
-                
+
                 // Prevent updates to completed/processed transactions
                 if (transaction.transaction_status > 1) {
                     await dbTransaction.rollback();
                     return res.status(400).json({
-                        success: false, 
-                        method: "updateTransaction", 
+                        success: false,
+                        method: "updateTransaction",
                         message: "Cannot update a processed transaction."
                     });
                 }
-                
+
                 // Build update object with only provided fields
                 const updateFields = {};
                 const allowedFields = [
-                    'transaction_amount', 
-                    'transaction_crypto_id', 
-                    'transaction_crypto_symbol', 
-                    'transaction_crypto_name', 
-                    'transaction_crypto_price', 
-                    'transaction_to_wallet_address', 
+                    'transaction_amount',
+                    'transaction_crypto_id',
+                    'transaction_crypto_symbol',
+                    'transaction_crypto_name',
+                    'transaction_crypto_price',
+                    'transaction_to_wallet_address',
                     'transaction_message'
                 ];
-                
+
                 allowedFields.forEach(field => {
                     if (req.body[field] !== undefined) {
                         updateFields[field] = req.body[field];
                     }
                 });
-                
+
                 if (Object.keys(updateFields).length === 0) {
                     await dbTransaction.rollback();
                     return res.status(400).json({
                         success: false,
-                        method: "updateTransaction", 
+                        method: "updateTransaction",
                         message: "No valid fields provided for update."
                     });
                 }
-                
+
                 // Update within transaction context
                 await transaction.update(updateFields, { transaction: dbTransaction });
-                
+
                 // Commit the transaction
                 await dbTransaction.commit();
-                
+
                 res.status(200).json({
                     success: true,
-                    method: "updateTransaction", 
-                    message: "Transaction updated successfully.", 
+                    method: "updateTransaction",
+                    message: "Transaction updated successfully.",
                     data: {
                         transaction: transaction
                     }
                 });
-            } catch(error) {
+            } catch (error) {
                 // Rollback on error
                 await dbTransaction.rollback();
                 console.error("Transaction update error:", error);
                 res.status(422).json({
                     success: false,
-                    method: "updateTransaction", 
-                    error: "An error occurred during transaction update.", 
+                    method: "updateTransaction",
+                    error: "An error occurred during transaction update.",
                     details: error.message
                 });
             }
@@ -327,14 +383,14 @@ class TransactionsController {
                 const transactionId = req.params.id;
                 const transaction = await Transaction.findOne({
                     where: {
-                        transaction_id: transactionId, 
+                        transaction_id: transactionId,
                         transaction_by: userId
                     }
                 });
                 const resp = {
-                    success: false, 
-                    method: "deleteTransaction", 
-                    message: "Transaction not found.", 
+                    success: false,
+                    method: "deleteTransaction",
+                    message: "Transaction not found.",
                     data: {
                         transaction: null
                     }
@@ -349,9 +405,9 @@ class TransactionsController {
             } catch (error) {
                 console.error("Transaction deletion error:", err);
                 res.status(422).json({
-                    success: false, 
-                    method: "deleteTransaction", 
-                    error: "An error occurred during transaction deletion", 
+                    success: false,
+                    method: "deleteTransaction",
+                    error: "An error occurred during transaction deletion",
                     details: error.message
                 });
             }
