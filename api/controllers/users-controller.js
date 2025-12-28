@@ -280,24 +280,43 @@ class UsersController {
 
                 // send welcome email to user
                 const mailOptions = {
-                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,
+                    from: `"Fiaxit" <${process.env.EMAIL_USERNAME}>`,
                     to: user.user_email,
-                    subject: 'Welcome to the app!',
+                    subject: 'Welcome to Fiaxit!',
                     html: `
-                        <h3>Hello ${user.user_fname},</h3>
-                        <p>Thank you for registering with us. We are excited to have you on board.</p>
-                        <br>
-                        Best regards,
-                        <br>
-                        - Fiaxit 👻
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 40px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;">
+                                <div style="margin-bottom: 25px;">
+                                    <span style="background-color: #d1e7dd; color: #0f5132; padding: 10px 20px; border-radius: 30px; font-size: 14px; font-weight: bold;">Account Verified</span>
+                                </div>
+                                <h2 style="margin-top: 0; color: #1a202c;">Welcome, ${user.user_fname}!</h2>
+                                <p style="font-size: 16px; color: #4a5568;">Your account is now fully active. We're thrilled to have you as part of the Fiaxit community.</p>
+                                
+                                <div style="margin: 35px 0;">
+                                    <a href="http://sites.local:3000/auth/login" style="background-color: #0d6efd; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Login to Dashboard</a>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #64748b;">Start exploring our features and manage your digital assets with confidence.</p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                                
+                                <p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">If you have any questions, our support team is always here to help.</p>
+                            </div>
+                            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 12px;">
+                                &copy; ${new Date().getFullYear()} Fiaxit. All rights reserved.
+                            </div>
+                        </div>
                     `
                 };
 
                 transporter.sendMail(mailOptions, (error, info) => {
                     if (error) {
-                        console.log('Error sending email:', error);
+                        console.log('Error sending welcome email:', error);
                     } else {
-                        console.log('Email sent:', info.response);
+                        console.log('Welcome email sent:', info.response);
                     }
                 });
 
@@ -478,23 +497,36 @@ class UsersController {
                     }
                 });
 
-                // send verification code to user
+                // send verification link to user
+                const verifyUrl = `http://sites.local:3000/auth/verify/${user.user_id}/${vericode}`;
                 const mailOptions = {
-                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,
+                    from: `"Fiaxit" <${process.env.EMAIL_USERNAME}>`,
                     to: email,
-                    subject: "Fiaxit 👻 Verification Code",
+                    subject: "Verify your Fiaxit Account",
                     html: `
-                        <h3>${user.user_fname},</h3>
-                        <p>Thank you for registering.</p>
-                        <p>Please verify your account by clicking on the this <a href="http://sites.local:6000/v1/auth/verify/${user.user_id}/${vericode}" target="_blank">link</a></p>
-                        <p>or copy and paste the link into your browser's address bar; http://sites.local:6000/v1/auth/verify/${user.user_id}/${vericode}
-                        <br>
-                        <p>If you did not create an account with us, please ignore this email.
-                        <br><br>
-                        With love,
-                        <br>
-                        - Fiaxit 👻
-                        </p>
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                <h2 style="margin-top: 0; color: #1a202c;">Hello ${user.user_fname},</h2>
+                                <p style="font-size: 16px;">You requested a new verification link for your Fiaxit account. Please click the button below to confirm your email address:</p>
+                                
+                                <div style="text-align: center; margin: 35px 0;">
+                                    <a href="${verifyUrl}" style="background-color: #0d6efd; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Verify My Account</a>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #64748b;">This link will expire in <strong>15 minutes</strong> for your security.</p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                                
+                                <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">If you didn't request this link, you can safely ignore this email.</p>
+                                <p style="font-size: 13px; color: #94a3b8; margin-top: 5px;">Or copy and paste this link: <br> <a href="${verifyUrl}" style="color: #0d6efd; word-break: break-all;">${verifyUrl}</a></p>
+                            </div>
+                            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 12px;">
+                                &copy; ${new Date().getFullYear()} Fiaxit. All rights reserved.
+                            </div>
+                        </div>
                     `
                 };
 
@@ -507,11 +539,11 @@ class UsersController {
                             message: "Resend verification failed: Email sending error."
                         });
                     } else {
-                        console.log('Email sent:', info.response);
+                        console.log('Verification email resent:', info.response);
                         return res.status(200).json({
                             success: true,
                             method: "resendVericode",
-                            message: "Verification code sent successfully.",
+                            message: "Verification link sent successfully.",
                             timeStamp: new Date().toISOString()
                         });
                     }
