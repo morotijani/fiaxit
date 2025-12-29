@@ -17,6 +17,7 @@ const { authenticate } = require('./api/middleware/check-auth');
 app.use(morgan('dev'));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+app.use('/public', express.static('public'));
 
 // CORS error handling
 app.use((req, res, next) => {

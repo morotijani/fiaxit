@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 const { Op } = require('sequelize');
 const { timeStamp } = require('console');
+const UserKyc = require('../models/user-kyc-model');
 const emailHelper = require('../helpers/email-helper');
 
 
@@ -572,8 +573,7 @@ class UsersController {
                     res.status(400).json({
                         success: false,
                         method: "userLogout",
-                        message: "User logout failed (Could not blacklist token): An error occurred while logging out the user.",
-                        error: error.message
+                        message: "User logout failed (Could not blacklist token): An error occurred while logging out the user."
                     });
                 }
             } catch (error) {
@@ -581,6 +581,43 @@ class UsersController {
                     success: false,
                     method: "userLogout",
                     message: "User logout failed: An error occurred while logging out the user.",
+                    error: error.message
+                });
+            }
+        }
+    }
+
+    uploadProfileImage = () => {
+        return async (req, res, next) => {
+            try {
+                if (!req.file) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "No file uploaded."
+                    });
+                }
+
+                const userId = req.userData.user_id;
+                const imagePath = req.file.path.replace(/\\/g, "/");
+
+                await User.update({
+                    user_image: imagePath
+                }, {
+                    where: { user_id: userId }
+                });
+
+                res.status(200).json({
+                    success: true,
+                    message: "Profile image uploaded successfully.",
+                    data: {
+                        user: await this.formatUserResponse(user, req)
+                    }
+                });
+            } catch (error) {
+                console.error("Profile image upload error:", error);
+                res.status(500).json({
+                    success: false,
+                    message: "Failed to upload profile image.",
                     error: error.message
                 });
             }
@@ -615,6 +652,7 @@ class UsersController {
                     user.user_lname = req.body.lname || user.user_lname
                     user.user_email = req.body.email || user.user_email
                     user.user_phone = req.body.phone || user.user_phone
+                    user.user_image = req.body.user_image || user.user_image
                     if (req.body.password) {
                         user.updatePassword = true
                         user.user_password = req.body.password
@@ -628,7 +666,7 @@ class UsersController {
                     await user.reload();
                     resp.success = true;
                     resp.method = "updateUser";
-                    resp.data = { user: user }
+                    resp.data = { user: await this.formatUserResponse(user, req) }
                 }
                 res.status(200).json(resp)
             } catch (error) {
@@ -652,14 +690,10 @@ class UsersController {
                     message: "Logged in user failed: User not found."
                 }
 
-                const user = req.userData
-                const data = user
-                delete data.user_password; // remove password from user data for security reasons
-
                 resp.success = true;
                 resp.method = "loggedInUser";
                 resp.message = "User is logged in.";
-                resp.data = data;
+                resp.data = await this.formatUserResponse(req.userData, req);
                 resp.timeStamp = new Date().toISOString();
 
                 res.status(200).json(resp);
@@ -985,7 +1019,7 @@ class UsersController {
                 return res.status(200).json({
                     success: true,
                     method: "findUserById",
-                    data: user
+                    data: await this.formatUserResponse(user, req)
                 });
 
             } catch (error) {
@@ -1003,6 +1037,28 @@ class UsersController {
     // 
     generateVerificationCode = () => {
         return Math.floor(Math.random() * (999999 - 100001)) + 100001;
+    }
+
+    /**
+     * Helper to format user object for public consumption
+     * @param {Object} user - User record (Sequelize model or plain object)
+     * @param {Object} req - Express request object
+     * @returns {Object} - Formatted user object
+     */
+    formatUserResponse = async (user, req) => {
+        const data = user.toJSON ? user.toJSON() : { ...user };
+
+        // Exclude sensitive fields
+        delete data.user_password;
+        delete data.user_pin;
+        delete data.user_vericode;
+
+        // Format image URL
+        if (data.user_image && !data.user_image.startsWith('http')) {
+            data.user_image = `${req.protocol}://${req.get('host')}/${data.user_image}`;
+        }
+
+        return data;
     }
 
 }

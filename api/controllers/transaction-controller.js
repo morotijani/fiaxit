@@ -6,6 +6,7 @@ const { Op } = require('sequelize'); // Import the Op object
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
 const EthereumWalletService = require('../service/ethereum-wallet-service');
+const USDTService = require('../service/usdt-service');
 const { decrypt } = require('../helpers/encryption');
 const NotificationController = require('./notification-controller');
 const emailHelper = require('../helpers/email-helper');
@@ -95,7 +96,7 @@ class TransactionsController {
                 const walletId = req.body.crypto_id;
 
                 // validate required fields
-                const requiredFields = ['amount', 'crypto_symbol', 'toAddress', 'crypto_id'];
+                const requiredFields = ['amount', 'crypto_symbol', 'toAddress', 'crypto_id', 'pin'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
@@ -121,6 +122,52 @@ class TransactionsController {
                         method: "createAndSend" + cryptoSymbol,
                         error: "Sender wallet not found or unauthorized."
                     });
+                }
+
+                // 2. Fetch user to verify PIN and check KYC limit
+                const user = await User.findOne({ where: { user_id: userId } });
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        method: "createAndSend",
+                        error: "User not found."
+                    });
+                }
+
+                // 2.1 Verify Transaction PIN
+                const isPinValid = await bcrypt.compare(req.body.pin.toString(), user.user_pin);
+                if (!isPinValid) {
+                    return res.status(401).json({
+                        success: false,
+                        method: "createAndSend",
+                        path: "pin",
+                        error: "Invalid transaction PIN."
+                    });
+                }
+
+                // 2.2 Check KYC Status & Daily Limit
+                if (user.kyc_status !== 'verified') {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const dailyCount = await Transaction.count({
+                        where: {
+                            transaction_by: userId,
+                            transaction_type: 'send',
+                            createdAt: {
+                                [Op.gte]: today
+                            }
+                        }
+                    });
+
+                    if (dailyCount >= 5) {
+                        return res.status(403).json({
+                            success: false,
+                            method: "createAndSend",
+                            error: "Daily transaction limit reached. Unverified users can only make 5 sends per day. Please complete your KYC to increase your limit.",
+                            kyc_status: user.kyc_status
+                        });
+                    }
                 }
 
                 // 2. Decrypt the private key internally
@@ -160,6 +207,7 @@ class TransactionsController {
                         });
                     }
                 } else if (cryptoSymbol === 'USDT') {
+                    result = await USDTService.SendUSDT(senderPrivateKey, receiverWalletAddress, amount);
 
                 } else if (cryptoSymbol === 'ETH') {
                     const speedTransaction = null;

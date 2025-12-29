@@ -18,32 +18,30 @@ const userAuth = require("../middleware/check-auth");
         "invitationcode": ""
     }
 */
+const storage = require('../helpers/storage');
+
 router.patch('/update/:id', userAuth.authenticate, UserController.update()); // update user
+
+// Profile Image Upload
+router.post('/profile-image', userAuth.authenticate, storage.single('profile_image'), UserController.uploadProfileImage());
 
 // KYC Routes
 /**
-    * Submit KYC documents
-    * body {
-    *   idType: "passport|national_id|drivers_license",
-    *   idNumber: "",
-    *   documentFront: "base64_encoded_image",
-    *   documentBack: "base64_encoded_image",
-    *   selfie: "base64_encoded_image",
-    *   address: {
-    *       street: "",
-    *       city: "",
-    *       state: "",
-    *       postalCode: "",
-    *       country: ""
-    *      }
-    * }
+    * Submit KYC documents (Multipart form-data)
+    * fields: kyc_id_type, kyc_id_number, address (JSON string)
+    * files: document_front, document_back, selfie
 */
-router.post('/kyc/submit', userAuth.authenticate, UserKYCController.submitKYC());
+router.post('/kyc/submit', userAuth.authenticate, storage.fields([
+    { name: 'document_front', maxCount: 1 },
+    { name: 'document_back', maxCount: 1 },
+    { name: 'selfie', maxCount: 1 }
+]), UserKYCController.submitKYC());
 
 // Get KYC status
 router.get('/kyc/status', userAuth.authenticate, UserKYCController.getKYCStatus());
 
-// Admin route to verify KYC (requires admin privileges)
-// router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, UserKYCController.verifyKYC());
+// Admin route to manage KYC (requires admin privileges)
+router.get('/kyc/pending', userAuth.authenticate, userAuth.isAdmin, UserKYCController.listPendingKYC());
+router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, UserKYCController.verifyKYC());
 
 module.exports = router;

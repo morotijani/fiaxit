@@ -24,7 +24,7 @@ const USERKYC = db.define('fiaxit_kyc', {
     },
     kyc_document_back: {
         type: DataTypes.TEXT,
-        allowNull: false
+        allowNull: true
     },
     kyc_selfie: {
         type: DataTypes.TEXT,
@@ -36,7 +36,7 @@ const USERKYC = db.define('fiaxit_kyc', {
     },
     kyc_street: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: true
     },
     kyc_city: {
         type: DataTypes.STRING,
@@ -53,7 +53,7 @@ const USERKYC = db.define('fiaxit_kyc', {
         allowNull: false
     },
     kyc_status: {
-        type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+        type: DataTypes.ENUM('pending', 'verified', 'rejected'),
         defaultValue: 'pending',
         allowNull: false
     },

@@ -64,6 +64,26 @@ const User = db.define('fiaxit_users', {
         type: DataTypes.ENUM('user', 'admin'),
         defaultValue: 'user'
     },
+    user_image: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    kyc_status: {
+        type: DataTypes.ENUM('unverified', 'pending', 'verified', 'rejected'),
+        defaultValue: 'unverified'
+    },
+    kyc_documents: {
+        type: DataTypes.JSON,
+        allowNull: true
+    },
+    kyc_rejection_reason: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    kyc_submitted_at: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
     createdAt: {
         type: DataTypes.DATE,
         defaultValue: Sequelize.NOW

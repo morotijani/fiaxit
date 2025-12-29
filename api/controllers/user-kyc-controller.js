@@ -1,218 +1,258 @@
 const User = require('../models/user-model');
 const UserKyc = require('../models/user-kyc-model');
-const { v4: uuidv4 } = require('uuid')
-const nodemailer = require('nodemailer')
-
-// Configure email transporter
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST, 
-    port: process.env.EMAIL_PORT, 
-    secure: true, // true for port 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USERNAME, 
-        pass: process.env.EMAIL_PASSWORD
-    }
-});
-
-// Verify SMTP connection
-transporter.verify((error, success) => {
-    if (error) {
-        console.log('SMTP server connection error:', error);
-    } else {
-        console.log('SMTP server connection successful');
-    }
-});
+const { v4: uuidv4 } = require('uuid');
+const emailHelper = require('../helpers/email-helper');
 
 class KYCController {
-    
+
     submitKYC = () => {
         return async (req, res, next) => {
             try {
-                const { kyc_id_type, kyc_id_number, kyc_document_front, kyc_document_back, kyc_selfie, address } = req.body; // Get address from request body
-                const userId = req.userData.user_id; // Get user ID from auth middleware
-                
-                // Find the user
-                const user = await User.findOne({
-                    where: {
-                        user_id: userId
-                    }
-                })
+                const { kyc_id_type, kyc_id_number, address } = req.body;
+                const userId = req.userData.user_id;
 
+                // 1. Validate files
+                if (!req.files || !req.files['document_front'] || !req.files['selfie']) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "KYC failed: Missing required documents (Front of ID and Selfie are required)."
+                    });
+                }
+
+                // 2. Normalize and check files
+                const docFront = req.files['document_front'][0].path.replace(/\\/g, "/");
+                const docBack = req.files['document_back'] ? req.files['document_back'][0].path.replace(/\\/g, "/") : null;
+                const selfie = req.files['selfie'][0].path.replace(/\\/g, "/");
+
+                // 3. Find the user
+                const user = await User.findOne({ where: { user_id: userId } });
                 if (!user) {
                     return res.status(404).json({
                         success: false,
-                        method: "submitKYC",
                         message: "KYC failed: User not found."
                     });
                 }
 
-                // Check if required KYC fields are provided
-                // validate required fields
-                const requiredFields = ['kyc_id_type', 'kyc_id_number', 'kyc_document_front', 'kyc_document_back', 'kyc_selfie', 'address'];
+                // 4. Validate metadata
+                const requiredFields = ['kyc_id_type', 'kyc_id_number', 'address'];
                 for (const field of requiredFields) {
                     if (!req.body[field]) {
                         return res.status(400).json({
-                            success: false, 
-                            method: "submitKYC", 
-                            message: `KYC failed: Missing required KYC information. Please provide the following: ${field}`
+                            success: false,
+                            message: `KYC failed: Missing ${field}`
                         });
                     }
                 }
-                
-                // Validate address if provided
-                if (address) {
-                    const requiredAddressFields = ['kyc_address', 'kyc_street', 'kyc_city', 'kyc_country'];
-                    for (const field of requiredAddressFields) {
-                        if (!address[field]) {
-                            return res.status(400).json({
-                                success: false,
-                                method: "submitKYC",
-                                message: `KYC failed: Missing required address information. Please provide the following: ${field}`
-                            });
-                        }
-                    }
-                }
 
-                // check if user in the kyc table and merge it to user
-                const userKyc = await UserKyc.findOne({ // get user
-                    where: {
-                        kyc_for : user.user_id
-                    }
-                })
-                
-                // Check if user already has KYC information
-                if (userKyc && userKyc.kyc_status !== 'rejected') {
+                const addr = typeof address === 'string' ? JSON.parse(address) : address;
+
+                // 5. Check existing KYC
+                const existingKyc = await UserKyc.findOne({ where: { kyc_for: userId } });
+                if (existingKyc && existingKyc.kyc_status !== 'rejected') {
                     return res.status(400).json({
-                        success: false, 
-                        method: "submitKYC", 
-                        message: `KYC failed: KYC verification is already submitted with status ${userKyc.kyc_status}. You cannot submit again.`
+                        success: false,
+                        message: `KYC already submitted. Current status: ${existingKyc.kyc_status}`
                     });
                 }
-                
-                // In a production environment, you would:
-                // 1. Upload documents to secure storage (AWS S3, etc.)
-                // 2. Store document URLs rather than the actual documents
 
-                // Create a new UserKyc record if one doesn't exist or if the previous one was rejected.
-                const newKycRecord = await UserKyc.create({
-                    kyc_id: uuidv4(), 
-                    kyc_for: user.user_id, 
-                    kyc_id_type: kyc_id_type, 
-                    kyc_id_number: kyc_id_number, 
-                    kyc_document_front: kyc_document_front, // In production, store URL instead
-                    kyc_document_back: kyc_document_back,   // In production, store URL instead
-                    kyc_selfie: kyc_selfie,                // In production, store URL instead
-                    kyc_address: address ? address.kyc_address : null, 
-                    kyc_street: address ? address.kyc_street : null, 
-                    kyc_city: address ? address.kyc_city : null, 
-                    kyc_state: address ? address.kyc_state : null || null, 
-                    kyc_postal_code: address ? address.kyc_postal_code: null || null, 
-                    kyc_country: address ? address.kyc_country : null,
+                // 6. Create or Update KYC Record
+                const kycData = {
+                    kyc_id: existingKyc ? existingKyc.kyc_id : uuidv4(),
+                    kyc_for: userId,
+                    kyc_id_type,
+                    kyc_id_number,
+                    kyc_document_front: docFront,
+                    kyc_document_back: docBack,
+                    kyc_selfie: selfie,
+                    kyc_address: addr.kyc_address || null,
+                    kyc_street: addr.kyc_street || null,
+                    kyc_city: addr.kyc_city || null,
+                    kyc_state: addr.kyc_state || null,
+                    kyc_postal_code: addr.kyc_postal_code || null,
+                    kyc_country: addr.kyc_country || null,
                     kyc_status: 'pending'
+                };
+
+                let kycRecord;
+                if (existingKyc) {
+                    kycRecord = await existingKyc.update(kycData);
+                } else {
+                    kycRecord = await UserKyc.create(kycData);
+                }
+
+                // 7. Update User model summary fields
+                await user.update({
+                    kyc_status: 'pending',
+                    kyc_submitted_at: new Date()
                 });
 
-                if (!newKycRecord) {
-                    return res.status(500).json({
-                        success: false,
-                        method: "submitKYC",
-                        message: "KYC failed: Failed to submit KYC information."
-                    });
-                }
-
-                // send user email on kyc submition
-                const mailOptions = {
-                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME, 
-                    to: user.user_email, 
-                    subject: 'KYC Information Submitted', 
-                    html:  `
-                        <h1>KYC Information Submitted</h1>
-                        <p>Dear ${user.user_fname} ${user.user_lname},</p>
-                        <p>Thank you for submitting your KYC information. Your application is currently under review.</p>
-                        <p>You will receive an email notification once your verification is complete.</p>
-                        <p>Sincerely,<br>The Fiaxit Team</p>
+                // 8. Send Email
+                await emailHelper.sendMail({
+                    to: user.user_email,
+                    subject: 'KYC Information Submitted | Fiaxit',
+                    html: `
+                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                            <h2 style="color: #0d6efd;">KYC Submission Received</h2>
+                            <p>Hello ${user.user_fname},</p>
+                            <p>We've received your KYC documents for verification. Our compliance team will review them shortly.</p>
+                            <p><strong>Status:</strong> Pending Verification</p>
+                            <p>You will receive another update once the review is completed.</p>
+                            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                            <p style="font-size: 12px; color: #666;">If you didn't initiate this, please contact support.</p>
+                        </div>
                     `
-                }
+                }).catch(e => console.error("KYC Email Error:", e));
 
-                await transporter.sendMail(mailOptions);
-                
                 return res.status(200).json({
                     success: true,
-                    method: "submitKYC",
-                    message: "KYC information submitted successfully. Your verification is pending review."
+                    message: "KYC submitted successfully. Status set to Pending.",
+                    data: { kyc_status: 'pending' }
                 });
             } catch (error) {
                 console.error(error);
                 return res.status(500).json({
                     success: false,
                     method: "submitKYC",
-                    message: "An error occurred while submitting KYC information.", 
+                    message: "An error occurred while submitting KYC information.",
                     details: error.message
                 });
             }
-        }
-    }
+        };
+    };
 
     // Get KYC status
     getKYCStatus = () => {
         return async (req, res, next) => {
             try {
-                const userId = req.userData.user_id; // Get user ID from auth middleware
-                
-                // Find the user
-                const user = await User.findOne({
-                    where: {
-                        user_id: userId
-                    }
-                });
-                
+                const userId = req.userData.user_id;
+
+                const user = await User.findOne({ where: { user_id: userId } });
                 if (!user) {
                     return res.status(404).json({
                         success: false,
-                        method: "getKYCStatus",
                         message: "User not found."
                     });
                 }
 
-                // check if user in the kyc table and merge it to user
-                const userKyc = await UserKyc.findOne({ // get user
-                    where: {
-                        kyc_for : user.user_id
-                    }
-                })
-                
-                // Check if user already has KYC information
-                // if (userKyc && userKyc.kyc_status !== 'rejected') {}
-                
-                // Check if user has submitted KYC
+                const userKyc = await UserKyc.findOne({ where: { kyc_for: userId } });
                 if (!userKyc) {
                     return res.status(200).json({
                         success: true,
-                        method: "getKYCStatus",
-                        message: "KYC not submitted yet.", 
+                        message: "KYC not submitted yet.",
                         kyc_status: "not_submitted"
                     });
                 }
-                
-                // Return KYC status
+
                 return res.status(200).json({
                     success: true,
-                    method: "getKYCStatus",
                     message: "KYC status retrieved successfully.",
                     kyc_status: userKyc.kyc_status,
-                    kyc_submitted_at: userKyc.createdAt // Include submission date
+                    kyc_submitted_at: userKyc.createdAt,
+                    rejection_reason: userKyc.kyc_rejection_reason
                 });
             } catch (error) {
                 console.error(error);
                 return res.status(500).json({
                     success: false,
-                    method: "getKYCStatus",
-                    message: "An error occurred while retrieving KYC status.",
-                    details: error.message
+                    message: "An error occurred while retrieving KYC status."
                 });
             }
-        }
-    }
+        };
+    };
+
+    // Admin: List all pending KYC
+    listPendingKYC = () => {
+        return async (req, res, next) => {
+            try {
+                const pendingKyc = await UserKyc.findAll({
+                    where: { kyc_status: 'pending' },
+                    include: [{
+                        model: User,
+                        as: 'user',
+                        attributes: ['user_fname', 'user_lname', 'user_email']
+                    }],
+                    order: [['createdAt', 'DESC']]
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    data: pendingKyc
+                });
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to fetch pending KYC."
+                });
+            }
+        };
+    };
+
+    // Admin: Verify (Approve/Reject) KYC
+    verifyKYC = () => {
+        return async (req, res, next) => {
+            try {
+                const { userId } = req.params;
+                const { status, reason } = req.body;
+
+                if (!['verified', 'rejected'].includes(status)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid status. Use 'verified' or 'rejected'."
+                    });
+                }
+
+                const user = await User.findOne({ where: { user_id: userId } });
+                const kyc = await UserKyc.findOne({ where: { kyc_for: userId } });
+
+                if (!user || !kyc) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "User or KYC record not found."
+                    });
+                }
+
+                await kyc.update({
+                    kyc_status: status,
+                    kyc_rejection_reason: status === 'rejected' ? reason : null
+                });
+
+                await user.update({
+                    kyc_status: status,
+                    kyc_rejection_reason: status === 'rejected' ? reason : null
+                });
+
+                await emailHelper.sendMail({
+                    to: user.user_email,
+                    subject: `KYC Verification ${status === 'verified' ? 'Approved' : 'Rejected'} | Fiaxit`,
+                    html: `
+                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                            <h2 style="color: ${status === 'verified' ? '#198754' : '#dc3545'};">
+                                KYC Verification ${status === 'verified' ? 'Approved' : 'Rejected'}
+                            </h2>
+                            <p>Hello ${user.user_fname},</p>
+                            <p>Your KYC verification request has been ${status === 'verified' ? 'approved' : 'rejected'}.</p>
+                            ${status === 'rejected' ? `<p><strong>Reason:</strong> ${reason}</p>` : '<p>You now have full access to all platform features and higher transaction limits.</p>'}
+                            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                            <p style="font-size: 12px; color: #666;">Fiaxit Compliance Team</p>
+                        </div>
+                    `
+                }).catch(e => console.error("KYC Result Email Error:", e));
+
+                return res.status(200).json({
+                    success: true,
+                    message: `KYC ${status} successfully.`
+                });
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to process KYC verification."
+                });
+            }
+        };
+    };
 
 }
 
-module.exports = new KYCController() // instantiate class and add to module so that we can use it anywhere else
+module.exports = new KYCController();
