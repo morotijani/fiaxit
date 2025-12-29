@@ -1,20 +1,37 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const algorithm = 'aes-256-cbc';
 const ivLength = 16;
+const debugLogPath = path.join(__dirname, '../../encryption_debug.txt');
+
+// Constants used for fallback
+const DEFAULT_KEY_STRING = 'default_secret_key_at_least_32_chars_long_12345';
+const DEFAULT_HASHED_KEY = crypto.createHash('sha256').update(DEFAULT_KEY_STRING).digest();
+
+function debugLog(msg) {
+    const timestamp = new Date().toISOString();
+    try {
+        fs.appendFileSync(debugLogPath, `[${timestamp}] ${msg}\n`);
+    } catch (e) {
+        console.error('Failed to write to debug log:', e.message);
+    }
+}
 
 /**
  * Derives a consistent 32-byte key from the environment variable.
  * Fallback to a hardcoded string if ENV is missing.
  */
 function getEncryptionKey() {
-    const rawKey = process.env.ENCRYPTION_KEY || 'default_secret_key_at_least_32_chars_long_12345';
+    const rawKey = process.env.ENCRYPTION_KEY || DEFAULT_KEY_STRING;
     // Hash to exactly 32 bytes to satisfy AES-256 requirement
-    return crypto.createHash('sha256').update(String(rawKey)).digest();
+    const k = crypto.createHash('sha256').update(String(rawKey)).digest();
+    debugLog(`Derived Key (from env/fallback). RawKey defined? ${!!process.env.ENCRYPTION_KEY}. Key length: ${k.length}`);
+    return k;
 }
 
 const key = getEncryptionKey();
-console.log('[Encryption] Derived Key Buffer Length:', key.length);
 
 /**
  * Encrypts sensitive text using AES-256-CBC
@@ -37,8 +54,12 @@ function encrypt(text) {
  * @returns {string} decryptedText
  */
 function decrypt(text) {
-    if (!text || !text.includes(':')) {
-        console.warn('[Encryption] Invalid encrypted text format (missing colon)');
+    if (!text) {
+        debugLog('Decrypt FAILED: Input text is null or empty.');
+        return null;
+    }
+    if (!text.includes(':')) {
+        debugLog(`Decrypt FAILED: Missing colon. Format suspect? Raw start: ${text.substring(0, 10)}...`);
         return null;
     }
 
@@ -49,45 +70,61 @@ function decrypt(text) {
 
         const iv = Buffer.from(ivHex, 'hex');
         const encryptedText = Buffer.from(encryptedHex, 'hex');
+        debugLog(`Attempting Decrypt. IV length: ${iv.length}. Encrypted length: ${encryptedText.length}.`);
 
-        // 1. Try with the primary (hashed) key
+        const rawKey = process.env.ENCRYPTION_KEY || DEFAULT_KEY_STRING;
+        debugLog(`System RawKey status: ${process.env.ENCRYPTION_KEY ? 'DEFINED' : 'FALLBACK'}. Key prefix: ${String(rawKey).substring(0, 4)}...`);
+
+        // 1. Try with the current system key (hashed)
         try {
             const decipher = crypto.createDecipheriv(algorithm, key, iv);
-            // When input is a Buffer, the second argument (input_encoding) should be null or omitted
             let decrypted = decipher.update(encryptedText, null, 'utf8');
             decrypted += decipher.final('utf8');
-            console.log('[Encryption] Primary decryption successful.');
+            debugLog('Primary decryption SUCCESS.');
             return decrypted;
         } catch (primaryErr) {
-            console.warn('[Encryption] Primary decryption failed:', primaryErr.message);
+            debugLog(`Primary decryption FAILED: ${primaryErr.message}`);
 
-            // 2. Fallback: Try with the raw key (legacy method)
-            const rawKey = process.env.ENCRYPTION_KEY || 'default_secret_key_at_least_32_chars_long_12345';
+            // 2. IMPORTANT FALLBACK: Hashed Default Key (Required for legacy wallets created without ENCRYPTION_KEY)
+            try {
+                debugLog('Trying Legacy Variation: Hashed Default Key...');
+                const decipherLegacy = crypto.createDecipheriv(algorithm, DEFAULT_HASHED_KEY, iv);
+                let decLegacy = decipherLegacy.update(encryptedText, null, 'utf8');
+                decLegacy += decipherLegacy.final('utf8');
+                debugLog('Legacy Hashed Default Key SUCCESS.');
+                return decLegacy;
+            } catch (errLegacy) {
+                debugLog(`Legacy Hashed Default Key FAILED: ${errLegacy.message}`);
+            }
 
-            // Variation A: Sliced/Padded buffer of raw string
+            // 3. Fallback Variation A: Sliced/Padded buffer of CURRENT raw string
             try {
                 const legacyKeyA = Buffer.alloc(32);
                 Buffer.from(String(rawKey)).copy(legacyKeyA);
                 const decipherA = crypto.createDecipheriv(algorithm, legacyKeyA, iv);
                 let decA = decipherA.update(encryptedText, null, 'utf8');
                 decA += decipherA.final('utf8');
-                console.log('[Encryption] Legacy Variation A successful.');
+                debugLog('Legacy Variation A SUCCESS.');
                 return decA;
-            } catch (errA) { }
+            } catch (errA) {
+                debugLog(`Legacy Variation A FAILED: ${errA.message}`);
+            }
 
-            // Variation B: Just the first 32 chars of the string raw
+            // 4. Fallback Variation B: Just the first 32 chars of the CURRENT string raw
             if (rawKey.length >= 32) {
                 try {
                     const legacyKeyB = rawKey.substring(0, 32);
                     const decipherB = crypto.createDecipheriv(algorithm, legacyKeyB, iv);
                     let decB = decipherB.update(encryptedText, null, 'utf8');
                     decB += decipherB.final('utf8');
-                    console.log('[Encryption] Legacy Variation B successful.');
+                    debugLog('Legacy Variation B SUCCESS.');
                     return decB;
-                } catch (errB) { }
+                } catch (errB) {
+                    debugLog(`Legacy Variation B FAILED: ${errB.message}`);
+                }
             }
 
-            // Variation C: Raw Key as Hex (Common if key is 64 chars)
+            // 5. Fallback Variation C: Raw Key as Hex (Common if key is 64 chars)
             if (rawKey.length === 64) {
                 try {
                     const legacyKeyC = Buffer.from(rawKey, 'hex');
@@ -95,16 +132,19 @@ function decrypt(text) {
                         const decipherC = crypto.createDecipheriv(algorithm, legacyKeyC, iv);
                         let decC = decipherC.update(encryptedText, null, 'utf8');
                         decC += decipherC.final('utf8');
-                        console.log('[Encryption] Legacy Variation C (Hex) successful.');
+                        debugLog('Legacy Variation C (Hex) SUCCESS.');
                         return decC;
                     }
-                } catch (errC) { }
+                } catch (errC) {
+                    debugLog(`Legacy Variation C FAILED: ${errC.message}`);
+                }
             }
 
+            debugLog('ALL decryption attempts FAILED.');
             return null;
         }
     } catch (globalErr) {
-        console.error('[Encryption] Global decryption error:', globalErr.message);
+        debugLog(`Global Decryption ERROR: ${globalErr.message}`);
         return null;
     }
 }
