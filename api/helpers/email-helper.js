@@ -75,6 +75,12 @@ const getTransactionTemplate = (userFname, amount, cryptoSymbol, type, address, 
                             </td>
                         </tr>
                         <tr>
+                            <td style="padding: 10px 0; color: #718096; border-bottom: 1px solid #f1f5f9;">Note</td>
+                            <td style="padding: 10px 0; color: #2d3748; font-family: monospace; text-align: right; border-bottom: 1px solid #f1f5f9; font-size: 12px;">
+                                ${note}
+                            </td>
+                        </tr>
+                        <tr>
                             <td style="padding: 10px 0; color: #718096; border-bottom: 1px solid #f1f5f9;">Transaction ID</td>
                             <td style="padding: 10px 0; color: #2d3748; font-family: monospace; text-align: right; border-bottom: 1px solid #f1f5f9; font-size: 12px;">
                                 ${txId.substring(0, 20)}...

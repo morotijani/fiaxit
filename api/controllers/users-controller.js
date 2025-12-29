@@ -10,6 +10,8 @@ const { Op } = require('sequelize');
 const { timeStamp } = require('console');
 const UserKyc = require('../models/user-kyc-model');
 const emailHelper = require('../helpers/email-helper');
+const fs = require('fs');
+const path = require('path');
 
 
 // Store verification codes temporarily (in production, use Redis or similar)
@@ -600,10 +602,26 @@ class UsersController {
                 const userId = req.userData.user_id;
                 const imagePath = req.file.path.replace(/\\/g, "/");
 
-                await User.update({
+                // Get current user to check for old image
+                const user = await User.findOne({ where: { user_id: userId } });
+                if (!user) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "User not found."
+                    });
+                }
+
+                // Delete old image if it exists
+                if (user.user_image) {
+                    const oldImagePath = path.join(__dirname, '..', '..', user.user_image);
+                    if (fs.existsSync(oldImagePath)) {
+                        fs.unlinkSync(oldImagePath);
+                        console.log('Deleted old profile image:', user.user_image);
+                    }
+                }
+
+                await user.update({
                     user_image: imagePath
-                }, {
-                    where: { user_id: userId }
                 });
 
                 res.status(200).json({
@@ -648,10 +666,10 @@ class UsersController {
                 // const user = await User.findByPk(userId) // find by using primary key
                 if (user) {
                     user.user_fname = req.body.fname || user.user_fname
-                    user.user_mname = req.body.mname || user.user_mname
+                    user.user_mname = req.body.mname || null
                     user.user_lname = req.body.lname || user.user_lname
                     user.user_email = req.body.email || user.user_email
-                    user.user_phone = req.body.phone || user.user_phone
+                    user.user_phone = req.body.phone || null
                     user.user_image = req.body.user_image || user.user_image
                     if (req.body.password) {
                         user.updatePassword = true
@@ -661,7 +679,7 @@ class UsersController {
                         user.updatePin = true;
                         user.user_pin = req.body.pin
                     }
-                    user.user_invitationcode = req.body.invitationcode || user.user_invitationcode
+                    user.user_invitationcode = req.body.invitationcode || null
                     await user.save();
                     await user.reload();
                     resp.success = true;
@@ -1038,6 +1056,82 @@ class UsersController {
     generateVerificationCode = () => {
         return Math.floor(Math.random() * (999999 - 100001)) + 100001;
     }
+
+    changePassword = () => {
+        return async (req, res, next) => {
+            try {
+                const { current_password, new_password } = req.body;
+                const userId = req.userData.user_id;
+
+                const user = await User.findOne({ where: { user_id: userId } });
+                if (!user) {
+                    return res.status(404).json({ success: false, message: "User not found." });
+                }
+
+                const isMatch = await bcrypt.compare(current_password, user.user_password);
+                if (!isMatch) {
+                    return res.status(401).json({ success: false, message: "Invalid current password." });
+                }
+
+                // Password complexity check
+                const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])[A-Za-z\d!@#$%^&*(),.?":{}|<>]{6,}$/;
+                if (!passwordRegex.test(new_password)) {
+                    return res.status(422).json({
+                        success: false,
+                        message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+                    });
+                }
+
+                user.user_password = new_password;
+                user.updatePassword = true;
+                await user.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Password changed successfully."
+                });
+            } catch (error) {
+                console.error("Change Password Error:", error);
+                return res.status(500).json({ success: false, message: "Internal server error." });
+            }
+        };
+    };
+
+    changePIN = () => {
+        return async (req, res, next) => {
+            try {
+                const { current_pin, new_pin } = req.body;
+                const userId = req.userData.user_id;
+
+                const user = await User.findOne({ where: { user_id: userId } });
+                if (!user) {
+                    return res.status(404).json({ success: false, message: "User not found." });
+                }
+
+                // PIN is hashed in DB, so use bcrypt.compare
+                const isMatch = await bcrypt.compare(current_pin.toString(), user.user_pin);
+                if (!isMatch) {
+                    return res.status(401).json({ success: false, message: "Invalid current PIN." });
+                }
+
+                if (isNaN(new_pin) || new_pin.toString().length !== 4) {
+                    return res.status(422).json({ success: false, message: "New PIN must be a 4-digit number." });
+                }
+
+                user.user_pin = new_pin;
+                user.updatePin = true;
+                await user.save();
+
+                return res.status(200).json({
+                    success: true,
+                    message: "PIN changed successfully."
+                });
+            } catch (error) {
+                console.error("Change PIN Error:", error);
+                return res.status(500).json({ success: false, message: "Internal server error." });
+            }
+        };
+    };
 
     /**
      * Helper to format user object for public consumption

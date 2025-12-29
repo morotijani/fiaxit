@@ -44,4 +44,8 @@ router.get('/kyc/status', userAuth.authenticate, UserKYCController.getKYCStatus(
 router.get('/kyc/pending', userAuth.authenticate, userAuth.isAdmin, UserKYCController.listPendingKYC());
 router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, UserKYCController.verifyKYC());
 
+// Security updates
+router.patch('/change-password', userAuth.authenticate, UserController.changePassword());
+router.patch('/change-pin', userAuth.authenticate, UserController.changePIN());
+
 module.exports = router;

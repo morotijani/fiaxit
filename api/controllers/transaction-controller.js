@@ -10,6 +10,7 @@ const USDTService = require('../service/usdt-service');
 const { decrypt } = require('../helpers/encryption');
 const NotificationController = require('./notification-controller');
 const emailHelper = require('../helpers/email-helper');
+const bcrypt = require('bcrypt');
 
 class TransactionsController {
 
@@ -103,7 +104,7 @@ class TransactionsController {
                             success: false,
                             method: "createAndSend" + cryptoSymbol,
                             path: field,
-                            error: `Missing required field: ${field}`
+                            message: `Missing required field: ${field}`
                         });
                     }
                 }
@@ -120,7 +121,7 @@ class TransactionsController {
                     return res.status(404).json({
                         success: false,
                         method: "createAndSend" + cryptoSymbol,
-                        error: "Sender wallet not found or unauthorized."
+                        message: "Sender wallet not found or unauthorized."
                     });
                 }
 
@@ -130,7 +131,7 @@ class TransactionsController {
                     return res.status(404).json({
                         success: false,
                         method: "createAndSend",
-                        error: "User not found."
+                        message: "User not found."
                     });
                 }
 
@@ -141,7 +142,7 @@ class TransactionsController {
                         success: false,
                         method: "createAndSend",
                         path: "pin",
-                        error: "Invalid transaction PIN."
+                        message: "Invalid transaction PIN."
                     });
                 }
 
@@ -164,7 +165,7 @@ class TransactionsController {
                         return res.status(403).json({
                             success: false,
                             method: "createAndSend",
-                            error: "Daily transaction limit reached. Unverified users can only make 5 sends per day. Please complete your KYC to increase your limit.",
+                            message: "Daily transaction limit reached. Unverified users can only make 5 sends per day. Please complete your KYC to increase your limit.",
                             kyc_status: user.kyc_status
                         });
                     }
@@ -176,7 +177,7 @@ class TransactionsController {
                     return res.status(500).json({
                         success: false,
                         method: "createAndSend" + cryptoSymbol,
-                        error: "Failed to retrieve wallet keys."
+                        message: "Failed to retrieve wallet keys."
                     });
                 }
 
@@ -201,8 +202,7 @@ class TransactionsController {
                         res.status(422).json({
                             success: false,
                             method: "createAndSend" + cryptoSymbol,
-                            message: "Bitcoin Transaction failed",
-                            result: result.error,
+                            message: "Bitcoin Transaction failed: " + (result.error || "Unknown error"),
                             details: result.details
                         });
                     }
@@ -237,8 +237,7 @@ class TransactionsController {
                         res.status(422).json({
                             success: false,
                             method: "createAndSend" + cryptoSymbol,
-                            message: "Ethereum Transaction failed",
-                            result: result.error,
+                            message: "Ethereum Transaction failed: " + (result.error || "Unknown error"),
                             details: result.details
                         });
                     }
@@ -367,7 +366,7 @@ class TransactionsController {
                 console.error("Transaction creation error:", error);
                 res.status(422).json({
                     success: false,
-                    error: "An error occurred during transaction creation",
+                    message: "An error occurred during transaction creation",
                     details: error.message
                 });
             }
@@ -460,7 +459,7 @@ class TransactionsController {
                 res.status(422).json({
                     success: false,
                     method: "updateTransaction",
-                    error: "An error occurred during transaction update.",
+                    message: "An error occurred during transaction update.",
                     details: error.message
                 });
             }
@@ -500,7 +499,7 @@ class TransactionsController {
                 res.status(422).json({
                     success: false,
                     method: "deleteTransaction",
-                    error: "An error occurred during transaction deletion",
+                    message: "An error occurred during transaction deletion",
                     details: error.message
                 });
             }
