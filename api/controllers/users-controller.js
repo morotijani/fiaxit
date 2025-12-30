@@ -11,6 +11,8 @@ const { timeStamp } = require('console');
 const UserKyc = require('../models/user-kyc-model');
 const emailHelper = require('../helpers/email-helper');
 const Notification = require('../models/notification-model');
+const SecurityController = require('./security-controller');
+const Session = require('../models/session-model');
 const fs = require('fs');
 const path = require('path');
 
@@ -346,10 +348,30 @@ class UsersController {
                             })
                         }
 
+                        // Check for 2FA
+                        if (user.user_2fa_enabled) {
+                            return res.status(200).json({
+                                success: true,
+                                method: "userLogin",
+                                requires_2fa: true,
+                                temp_user_id: user.user_id, // so frontend knows which user to verify
+                                message: "Two-factor authentication required."
+                            });
+                        }
+
                         const signVals = user.toJSON(); //
                         delete signVals.password // remove password from the signvals
                         const token = await jwt.sign(signVals, process.env.JWT_KEY, {
                             expiresIn: "7d"
+                        });
+
+                        // 3. Create Session Record
+                        await Session.create({
+                            session_id: uuidv4(),
+                            user_id: user.user_id,
+                            ip_address: req.ip,
+                            user_agent: req.headers['user-agent'],
+                            device_name: req.headers['user-agent'].split(')')[0].split('(')[1] || 'Unknown Device'
                         });
 
                         // send email to log in user
@@ -363,6 +385,7 @@ class UsersController {
                                 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
                                     <div style="text-align: center; padding: 20px 0;">
                                         <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                                        ${emailHelper.getAntiPhishingBadge(user.user_anti_phishing_code)}
                                     </div>
                                     <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                         <h2 style="margin-top: 0; color: #1a202c; font-size: 22px;">New Sign-in Detected</h2>
@@ -410,8 +433,8 @@ class UsersController {
                         resp.success = true;
                         resp.method = "userLogin";
                         resp.errors = [];
-                        resp.token = token,
-                            resp.timeStamp = new Date().toISOString()
+                        resp.token = token;
+                        resp.timeStamp = new Date().toISOString();
                     }
                 } else {
                     return res.status(401).json({
@@ -431,6 +454,64 @@ class UsersController {
                 });
             }
         }
+    }
+
+    // verify 2FA during login
+    verifyLogin2FA = () => {
+        return async (req, res) => {
+            try {
+                const { user_id, token } = req.body;
+                if (!user_id || !token) {
+                    return res.status(400).json({ success: false, message: "User ID and token are required." });
+                }
+
+                const user = await User.findOne({ where: { user_id } });
+                if (!user) {
+                    return res.status(404).json({ success: false, message: "User not found." });
+                }
+
+                const verified = SecurityController.verifyToken(user.user_2fa_secret, token);
+
+                if (verified) {
+                    const signVals = user.toJSON();
+                    delete signVals.user_password;
+                    delete signVals.user_2fa_secret;
+
+                    const jwtToken = await jwt.sign(signVals, process.env.JWT_KEY, {
+                        expiresIn: "7d"
+                    });
+
+                    // Create Session Record
+                    await Session.create({
+                        session_id: uuidv4(),
+                        user_id: user.user_id,
+                        ip_address: req.ip,
+                        user_agent: req.headers['user-agent'],
+                        device_name: req.headers['user-agent'].split(')')[0].split('(')[1] || 'Unknown Device'
+                    });
+
+                    res.status(200).json({
+                        success: true,
+                        method: "verifyLogin2FA",
+                        token: jwtToken,
+                        timeStamp: new Date().toISOString()
+                    });
+                } else {
+                    res.status(401).json({
+                        success: false,
+                        method: "verifyLogin2FA",
+                        message: "Invalid 2FA code."
+                    });
+                }
+            } catch (error) {
+                res.status(500).json({
+                    success: false,
+                    method: "verifyLogin2FA",
+                    message: "Verification failed.",
+                    details: error.message
+                });
+            }
+        };
     }
 
     resendVericode = () => {

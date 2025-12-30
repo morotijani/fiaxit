@@ -36,9 +36,22 @@ const sendMail = async (options) => {
 };
 
 /**
+ * Returns a small badge for anti-phishing code.
+ */
+const getAntiPhishingBadge = (code) => {
+    if (!code) return '';
+    return `
+        <div style="background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 15px; margin: 20px 0; display: inline-block;">
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 3px;">Anti-Phishing Code</div>
+            <div style="font-size: 14px; color: #1e293b; font-weight: 600;">${code}</div>
+        </div>
+    `;
+};
+
+/**
  * Returns a styled HTML template for transactions.
  */
-const getTransactionTemplate = (userFname, amount, cryptoSymbol, type, address, txId) => {
+const getTransactionTemplate = (userFname, amount, cryptoSymbol, type, address, txId, antiPhishingCode, note = 'N/A') => {
     const isSent = type.toLowerCase() === 'send' || type.toLowerCase() === 'sent';
     const action = isSent ? 'Sent' : 'Received';
     const color = isSent ? '#dc3545' : '#198754';
@@ -48,6 +61,7 @@ const getTransactionTemplate = (userFname, amount, cryptoSymbol, type, address, 
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
             <div style="text-align: center; padding: 20px 0;">
                 <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                ${getAntiPhishingBadge(antiPhishingCode)}
             </div>
             <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 <h2 style="margin-top: 0; color: #1a202c; font-size: 22px;">Transaction ${action}</h2>
@@ -103,4 +117,4 @@ const getTransactionTemplate = (userFname, amount, cryptoSymbol, type, address, 
     `;
 };
 
-module.exports = { sendMail, getTransactionTemplate };
+module.exports = { sendMail, getTransactionTemplate, getAntiPhishingBadge };

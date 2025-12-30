@@ -32,6 +32,7 @@ router.post('/resend-vericode', AuthController.resendVericode()); // resend veri
     }
 */
 router.post('/login', AuthController.login()); // login user
+router.post('/login/2fa', AuthController.verifyLogin2FA()); // verify 2fa during login
 
 // Usage (example): GET /api/v1/loggedInUser
 router.get('/loggedInUser', userAuth.authenticate, AuthController.loggedInUser()); // logged in user

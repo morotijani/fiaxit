@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/users-controller');
 const UserKYCController = require('../controllers/user-kyc-controller');
+const SecurityController = require('../controllers/security-controller');
 const userAuth = require("../middleware/check-auth");
 
 // Usage (example): PATCH /api/v1/update/:id
@@ -47,5 +48,23 @@ router.patch('/kyc/verify/:userId', userAuth.authenticate, userAuth.isAdmin, Use
 // Security updates
 router.patch('/change-password', userAuth.authenticate, UserController.changePassword());
 router.patch('/change-pin', userAuth.authenticate, UserController.changePIN());
+
+// 2FA Routes
+router.get('/2fa/setup', userAuth.authenticate, SecurityController.setup2FA());
+router.post('/2fa/enable', userAuth.authenticate, SecurityController.enable2FA());
+router.post('/2fa/disable', userAuth.authenticate, SecurityController.disable2FA());
+
+// Whitelisting Routes
+router.get('/whitelisting', userAuth.authenticate, SecurityController.getWhitelistedAddresses());
+router.post('/whitelisting', userAuth.authenticate, SecurityController.addWhitelistedAddress());
+router.delete('/whitelisting/:id', userAuth.authenticate, SecurityController.removeWhitelistedAddress());
+router.patch('/whitelisting/toggle', userAuth.authenticate, SecurityController.toggleWhitelisting());
+
+// Session Routes
+router.get('/sessions', userAuth.authenticate, SecurityController.getSessions());
+router.delete('/sessions/:id', userAuth.authenticate, SecurityController.revokeSession());
+
+// Anti-Phishing Routes
+router.patch('/anti-phishing', userAuth.authenticate, SecurityController.setAntiPhishingCode());
 
 module.exports = router;

@@ -20,6 +20,10 @@ const Wallet = db.define('fiaxit_wallets', {
         type: DataTypes.STRING(100),
         allowNull: false
     },
+    wallet_symbol: {
+        type: DataTypes.STRING(100),
+        allowNull: false
+    },
     wallet_crypto_name: {
         type: DataTypes.STRING(150),
         allowNull: false

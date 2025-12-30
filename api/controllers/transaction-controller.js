@@ -2,6 +2,7 @@ const Transaction = require("../models/transaction-model");
 const Wallet = require("../models/wallet-model");
 const Coin = require("../models/coin-model");
 const User = require("../models/user-model");
+const WhitelistedAddress = require("../models/whitelisted-address-model");
 const { Op } = require('sequelize'); // Import the Op object
 const { v4: uuidv4 } = require('uuid')
 const BitcoinWalletService = require('../service/bitcoin-wallet-service');
@@ -144,6 +145,26 @@ class TransactionsController {
                         path: "pin",
                         message: "Invalid transaction PIN."
                     });
+                }
+
+                // 2.3 Verify Whitelisted Address (if enabled)
+                if (user.user_whitelisting_enabled) {
+                    const isWhitelisted = await WhitelistedAddress.findOne({
+                        where: {
+                            user_id: userId,
+                            coin_symbol: cryptoSymbol.toUpperCase(),
+                            address: receiverWalletAddress,
+                            is_whitelisted: true
+                        }
+                    });
+
+                    if (!isWhitelisted) {
+                        return res.status(403).json({
+                            success: false,
+                            method: "createAndSend",
+                            message: "Withdrawal address is not whitelisted. Please whitelist the address in security settings first."
+                        });
+                    }
                 }
 
                 // 2.2 Check KYC Status & Daily Limit
@@ -325,7 +346,8 @@ class TransactionsController {
                                         cryptoSymbol,
                                         'send',
                                         receiverWalletAddress,
-                                        result.txid
+                                        result.txid,
+                                        sender.user_anti_phishing_code
                                     )
                                 });
                             }
@@ -343,7 +365,8 @@ class TransactionsController {
                                             cryptoSymbol,
                                             'receive',
                                             result.senderWalletAddress,
-                                            result.txid
+                                            result.txid,
+                                            receiver.user_anti_phishing_code
                                         )
                                     });
                                 }

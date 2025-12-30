@@ -63,6 +63,22 @@ const User = db.define('fiaxit_users', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
+    user_2fa_secret: {
+        type: DataTypes.STRING(300),
+        allowNull: true
+    },
+    user_2fa_enabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    user_whitelisting_enabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    user_anti_phishing_code: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
     user_invitationcode: {
         type: DataTypes.STRING(50)
     },
