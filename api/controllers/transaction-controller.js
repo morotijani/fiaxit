@@ -528,6 +528,42 @@ class TransactionsController {
             }
         }
     }
+
+    // Export transactions to CSV
+    exportCSV = () => {
+        return async (req, res) => {
+            try {
+                const userId = req.userData.user_id;
+                const transactions = await Transaction.findAll({
+                    where: {
+                        [Op.or]: [
+                            { transaction_by: userId },
+                            { transaction_to: userId }
+                        ]
+                    },
+                    order: [['createdAt', 'DESC']]
+                });
+
+                // CSV Headers
+                let csv = 'ID,Date,Symbol,Type,Amount,From,To,Status,Fee\n';
+
+                // Add rows
+                transactions.forEach(t => {
+                    const date = t.createdAt.toISOString();
+                    const type = t.transaction_by === userId ? 'Send' : 'Receive';
+                    const amount = t.transaction_amount;
+                    csv += `"${t.transaction_id}","${date}","${t.transaction_symbol}","${type}","${amount}","${t.transaction_from}","${t.transaction_to}","${t.transaction_status}","${t.transaction_fee}"\n`;
+                });
+
+                res.header('Content-Type', 'text/csv');
+                res.attachment(`fiaxit_transactions_${new Date().getTime()}.csv`);
+                return res.send(csv);
+            } catch (err) {
+                console.error("Export error:", err);
+                res.status(500).json({ success: false, message: "Export failed", error: err.message });
+            }
+        };
+    }
 }
 
 module.exports = new TransactionsController()

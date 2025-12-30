@@ -5,10 +5,10 @@ class ContactsController {
     getAll = () => {
         return async (req, res, next) => {
             const userId = req.userData.user_id;
-            const {count, rows} = await Contact.findAndCountAll({
+            const { count, rows } = await Contact.findAndCountAll({
                 where: {
                     user_id: userId,
-                }, 
+                },
                 order: [
                     ["lname", "ASC"], ["fname", "ASC"]
                 ]
@@ -24,22 +24,31 @@ class ContactsController {
     create = () => {
         return async (req, res, next) => {
             try {
-                const userId = req.userData.user_id
+                const userId = req.userData.user_id;
+                const { fname, lname, nickname, email, phone, wallet_address, coin_symbol, message } = req.body;
+
+                // Simple backend validation
+                if (!wallet_address || !coin_symbol) {
+                    return res.status(422).json({ success: false, message: "Wallet address and coin are required." });
+                }
+
                 const contact = await Contact.create({
-                    fname: req.body.fname, 
-                    lname: req.body.lname, 
-                    email: req.body.email, 
-                    phone: req.body.phone, 
-                    message: req.body.message, 
+                    fname, lname, nickname, email, phone, wallet_address, coin_symbol, message,
                     user_id: userId
                 });
+
                 res.status(200).json({
-                    success: true, 
-                    method: "create",  
+                    success: true,
+                    method: "create",
                     contact: contact
                 })
             } catch (err) {
-                res.status(422).json(err.error)
+                console.error("Create contact error:", err);
+                res.status(422).json({
+                    success: false,
+                    message: err.message || "Failed to create contact",
+                    errors: err.errors
+                });
             }
         }
     }
@@ -57,14 +66,14 @@ class ContactsController {
                 }
             })
             const resp = {
-                success: false, 
+                success: false,
                 method: "find by id",
                 contact: null
             }
             if (contact) {
                 resp.success = true,
-                resp.method = "find by id",
-                resp.contact = contact
+                    resp.method = "find by id",
+                    resp.contact = contact
             }
             res.status(200).json(resp)
         }
@@ -76,14 +85,14 @@ class ContactsController {
                 const userId = req.userData.user_id
                 const contactId = req.params.id
                 const resp = {
-                    success: false, 
-                    method: "update", 
+                    success: false,
+                    method: "update",
                     contact: null,
                     msg: "Contact not found."
                 }
                 const contact = await Contact.findOne({
                     where: {
-                        id: contactId, 
+                        id: contactId,
                         user_id: userId
                     }
                 })
@@ -91,12 +100,15 @@ class ContactsController {
                     const vals = {
                         fname: req.body.fname,
                         lname: req.body.lname,
+                        nickname: req.body.nickname,
                         email: req.body.email,
-                        phone: req.body.phone, 
+                        phone: req.body.phone,
+                        wallet_address: req.body.wallet_address,
+                        coin_symbol: req.body.coin_symbol,
                         message: req.body.message
                     }
                     await Contact.update(
-                        vals, 
+                        vals,
                         {
                             where: {
                                 id: contact.id
@@ -110,10 +122,15 @@ class ContactsController {
                     resp.contact = contact;
                 }
                 res.status(200).json(resp)
-            } catch(err) {
-                res.status(422).json(err.error)
+            } catch (err) {
+                console.error("Update contact error:", err);
+                res.status(422).json({
+                    success: false,
+                    message: err.message || "Failed to update contact",
+                    errors: err.errors
+                })
             }
-            
+
         }
     }
 
@@ -123,14 +140,14 @@ class ContactsController {
             const userId = req.userData.user_id;
             const contact = await Contact.findOne({
                 where: {
-                    id: contactId, 
+                    id: contactId,
                     user_id: userId
                 }
             })
             const resp = {
-                success: false, 
-                method: "delete", 
-                msg: "Contact not found.", 
+                success: false,
+                method: "delete",
+                msg: "Contact not found.",
                 contact: null
             }
             if (contact) {

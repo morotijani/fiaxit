@@ -4,6 +4,7 @@ const User = require('../models/user-model');
 const WhitelistedAddress = require('../models/whitelisted-address-model');
 const Session = require('../models/session-model');
 const { encrypt, decrypt } = require('../helpers/encryption');
+const { v4: uuidv4 } = require('uuid');
 
 class SecurityController {
     // 1. Setup 2FA: Generate secret and return QR code
@@ -156,22 +157,37 @@ class SecurityController {
             try {
                 const { address, coin_symbol, label } = req.body;
                 const userId = req.userData.user_id;
-                const { v4: uuidv4 } = require('uuid');
 
                 if (!address || !coin_symbol) {
-                    return res.status(400).json({ success: false, message: "Address and coin symbol are required." });
+                    return res.status(422).json({ success: false, message: "Address and coin symbol are required." });
+                }
+
+                // Basic Backend Validation (mirroring frontend)
+                const symbol = coin_symbol.toUpperCase();
+                let isValid = true;
+                if (symbol === 'BTC') {
+                    isValid = /^(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,65})$/.test(address);
+                } else if (symbol === 'ETH') {
+                    isValid = /^0x[a-fA-F0-9]{40}$/.test(address);
+                } else if (symbol === 'USDT') {
+                    isValid = /^(0x[a-fA-F0-9]{40}|T[1-9A-HJ-NP-Za-km-z]{33})$/.test(address);
+                }
+
+                if (!isValid) {
+                    return res.status(422).json({ success: false, message: `Invalid ${symbol} address format.` });
                 }
 
                 const newAddr = await WhitelistedAddress.create({
                     address_id: uuidv4(),
                     user_id: userId,
-                    coin_symbol: coin_symbol.toUpperCase(),
+                    coin_symbol: symbol,
                     address,
                     label
                 });
 
                 res.status(201).json({ success: true, message: "Address added to whitelist.", data: newAddr });
             } catch (error) {
+                console.error("Whitelist add error:", error);
                 res.status(500).json({ success: false, message: "Failed to add address.", error: error.message });
             }
         };

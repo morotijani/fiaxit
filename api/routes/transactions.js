@@ -4,8 +4,11 @@ const TransactionsController = require("../controllers/transaction-controller");
 
 
 // route grouping
-router.route('/') 
+router.route('/')
     .get(TransactionsController.getAll()) // get all transactions
+
+router.route('/export')
+    .get(TransactionsController.exportCSV());
 
 router.route('/:id')
     .get(TransactionsController.findById()) // get transaction by id

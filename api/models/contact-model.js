@@ -23,8 +23,21 @@ const Contact = db.define('fiaxit_contacts', {
     phone: {
         type: DataTypes.STRING(55)
     },
+    nickname: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    wallet_address: {
+        type: DataTypes.STRING(300),
+        allowNull: true
+    },
+    coin_symbol: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
     message: {
         type: DataTypes.STRING(500),
+        allowNull: true,
         validate: {
             len: {
                 msg: "Message content cannot be more than 500 words.",
