@@ -12,6 +12,7 @@ const UserKyc = require('../models/user-kyc-model');
 const emailHelper = require('../helpers/email-helper');
 const Notification = require('../models/notification-model');
 const SecurityController = require('./security-controller');
+const PortfolioController = require('./portfolio-controller');
 const Session = require('../models/session-model');
 const fs = require('fs');
 const path = require('path');
@@ -430,6 +431,9 @@ class UsersController {
                         // Send the email notification
                         await emailHelper.sendMail(mailOptions).catch(err => console.error('Login email error:', err));
 
+                        // Trigger Balance Snapshot
+                        PortfolioController._takeSnapshotInternal(user.user_id, signVals);
+
                         resp.success = true;
                         resp.method = "userLogin";
                         resp.errors = [];
@@ -489,6 +493,9 @@ class UsersController {
                         user_agent: req.headers['user-agent'],
                         device_name: req.headers['user-agent'].split(')')[0].split('(')[1] || 'Unknown Device'
                     });
+
+                    // Trigger Balance Snapshot
+                    PortfolioController._takeSnapshotInternal(user.user_id, signVals);
 
                     res.status(200).json({
                         success: true,

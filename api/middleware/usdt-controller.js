@@ -2,6 +2,7 @@ const USDTService = require('../service/usdt-service');
 const Wallet = require("../models/wallet-model");
 const Coin = require("../models/coin-model");
 const { decrypt } = require('../helpers/encryption');
+const PortfolioController = require('../controllers/portfolio-controller');
 
 class USDTController {
 
@@ -70,6 +71,9 @@ class USDTController {
                         details: result.details
                     });
                 }
+
+                // Trigger Balance Snapshot
+                PortfolioController._takeSnapshotInternal(userId, req.userData);
 
                 res.status(200).json({
                     success: true,

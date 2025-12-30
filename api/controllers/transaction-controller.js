@@ -11,6 +11,7 @@ const USDTService = require('../service/usdt-service');
 const { decrypt } = require('../helpers/encryption');
 const NotificationController = require('./notification-controller');
 const emailHelper = require('../helpers/email-helper');
+const PortfolioController = require('./portfolio-controller');
 const bcrypt = require('bcrypt');
 
 class TransactionsController {
@@ -375,6 +376,13 @@ class TransactionsController {
                             console.error('[TransactionsController] Email notification failed:', emailErr);
                         }
                     })();
+
+                    // 7. Trigger Balance Snapshot for both sender and receiver (if internal)
+                    // We don't await this to avoid delaying the response
+                    PortfolioController._takeSnapshotInternal(userId, req.userData);
+                    if (to_id) {
+                        PortfolioController._takeSnapshotInternal(to_id, { user_id: to_id });
+                    }
 
                     res.status(201).json({
                         success: true,

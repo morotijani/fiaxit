@@ -15,13 +15,25 @@ class PortfolioController {
                 const startDate = new Date();
                 startDate.setDate(startDate.getDate() - days);
 
-                const data = await BalanceSnapshot.findAll({
+                let data = await BalanceSnapshot.findAll({
                     where: {
                         user_id: userId,
                         snapshot_at: { [Op.gte]: startDate }
                     },
                     order: [['snapshot_at', 'ASC']]
                 });
+
+                // If no snapshots exist, take one immediately
+                if (data.length === 0) {
+                    await this._takeSnapshotInternal(userId, req.userData);
+                    data = await BalanceSnapshot.findAll({
+                        where: {
+                            user_id: userId,
+                            snapshot_at: { [Op.gte]: startDate }
+                        },
+                        order: [['snapshot_at', 'ASC']]
+                    });
+                }
 
                 res.status(200).json({
                     success: true,
@@ -62,9 +74,9 @@ class PortfolioController {
                     user_id: userId,
                     total_balance_usd: totalUsd
                 });
-                return totalUsd;
+                console.log(`Snapshot recorded for user ${userId}: $${totalUsd}`);
             }
-            return 0;
+            return totalUsd;
         } catch (err) {
             console.error(`Snapshot failed for user ${userId}:`, err.message);
             return 0;
