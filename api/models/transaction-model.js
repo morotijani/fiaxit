@@ -1,10 +1,17 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const db = require('./db');
+const User = require('./user-model');
 
 const Transaction = db.define('fiaxit_transactions', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     transaction_id: {
         type: DataTypes.STRING(100),
         allowNull: false,
+        unique: true
     },
     transaction_hash_id: {
         type: DataTypes.STRING(100),
@@ -73,20 +80,25 @@ const Transaction = db.define('fiaxit_transactions', {
     }
 }, {
     indexes: [
-        { fields: ['transaction_id'] },
-        { fields: ['transaction_hash_id'] },
         { fields: ['transaction_by'] },
         { fields: ['transaction_to_wallet_address'] },
         { fields: ['transaction_status'] }
     ],
     timestamps: true, // Enable timestamps
-    // underscored: true, // Use snake_case for auto-generated fields
     paranoid: true,
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    tableName: 'fiaxit_transactions',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 });
 
-// Use { force: false, alter: true } for safer migrations in development
+// Associations
+Transaction.belongsTo(User, { as: 'sender', foreignKey: 'transaction_by', targetKey: 'user_id' });
+User.hasMany(Transaction, { foreignKey: 'transaction_by', sourceKey: 'user_id' });
+
+// Sync Options
 const syncOptions = process.env.NODE_ENV === 'development'
     ? { alter: true }
     : { force: false };

@@ -3,9 +3,15 @@ const { v4: uuidv4 } = require('uuid')
 const db = require('./db');
 
 const UserForgetPassword = db.define('fiaxit_user_forget_password', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     password_reset_id: {
         type: DataTypes.STRING(255),
         allowNull: false,
+        unique: true
     },
     password_reset_user_id: {
         type: DataTypes.STRING(255),
@@ -35,10 +41,6 @@ const UserForgetPassword = db.define('fiaxit_user_forget_password', {
 }, {
     indexes: [
         {
-            unique: true,
-            fields: ['password_reset_id']
-        },
-        {
             fields: ['password_reset_user_id']
         },
         {
@@ -57,6 +59,7 @@ const UserForgetPassword = db.define('fiaxit_user_forget_password', {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     tableName: 'fiaxit_user_forget_password',
+    engine: 'InnoDB',
     charset: 'utf8',
     collate: 'utf8_general_ci',
 })

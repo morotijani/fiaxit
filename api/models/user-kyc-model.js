@@ -1,14 +1,22 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const db = require('./db');
+const User = require('./user-model');
 
 const USERKYC = db.define('fiaxit_kyc', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     kyc_id: {
         type: DataTypes.STRING(100),
-        allowNull: false
+        allowNull: false,
+        unique: true
     },
     kyc_for: {
         type: DataTypes.STRING(100),
-        allowNull: false
+        allowNull: false,
+        unique: true
     },
     kyc_id_type: {
         type: DataTypes.STRING(100),
@@ -67,24 +75,39 @@ const USERKYC = db.define('fiaxit_kyc', {
     }
 }, {
     indexes: [
-        { fields: ['kyc_id'] },
-        { fields: ['kyc_for'] },
         { fields: ['kyc_id_type'] },
         { fields: ['kyc_id_number'] },
         { fields: ['kyc_status'] },
         { fields: ['createdAt'] }
     ],
-    timestamps: true, // Enable timestamps
-    // underscored: true, // Use snake_case for auto-generated fields
+    timestamps: true,
     paranoid: true,
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     tableName: 'fiaxit_kyc',
+    engine: 'InnoDB',
     charset: 'utf8',
     collate: 'utf8_general_ci',
 });
 
-// Use { force: false, alter: true } for safer migrations in development
+// Associations
+USERKYC.belongsTo(User, {
+    as: 'user',
+    foreignKey: 'kyc_for',
+    targetKey: 'user_id',
+    onUpdate: 'CASCADE',
+    onDelete: 'NO ACTION'
+});
+
+User.hasOne(USERKYC, {
+    as: 'kyc',
+    foreignKey: 'kyc_for',
+    sourceKey: 'user_id',
+    onUpdate: 'CASCADE',
+    onDelete: 'NO ACTION'
+});
+
+// Sync Options
 const syncOptions = process.env.NODE_ENV === 'development'
     ? { alter: true }
     : { force: false };

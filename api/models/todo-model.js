@@ -1,8 +1,12 @@
 const { DataTypes } = require('sequelize');
 const db = require('./db');
 
-const Todo = db.define('Todo', {
-    // there is not need to add id, mysql will add id by default as a primary key
+const Todo = db.define('fiaxit_todos', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     user_id: {
         type: DataTypes.STRING(100),
         allowNull: true
@@ -24,8 +28,16 @@ const Todo = db.define('Todo', {
     indexes: [
         { fields: ['user_id'] },
         { fields: ['user_id', 'completed'] }
-    ]
+    ],
+    tableName: 'fiaxit_todos',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 })
 
-Todo.sync(); // sync into our database;
+const syncOptions = process.env.NODE_ENV === 'development'
+    ? { alter: true }
+    : { force: false };
+
+Todo.sync(syncOptions);
 module.exports = Todo;

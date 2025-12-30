@@ -3,9 +3,15 @@ const { Sequelize, DataTypes } = require('sequelize');
 const bcrypt = require('bcrypt');
 
 const User = db.define('fiaxit_users', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     user_id: {
         type: DataTypes.STRING(100),
-        allowNull: false
+        allowNull: false,
+        unique: true
     },
     user_fname: {
         type: DataTypes.STRING
@@ -68,6 +74,14 @@ const User = db.define('fiaxit_users', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    user_dob: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+    },
+    user_gender: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+    },
     kyc_status: {
         type: DataTypes.ENUM('unverified', 'pending', 'verified', 'rejected'),
         defaultValue: 'unverified'
@@ -94,7 +108,6 @@ const User = db.define('fiaxit_users', {
     }
 }, {
     indexes: [
-        { fields: ['user_id'] },
         { unique: true, fields: ['user_email'] },
         { fields: ['user_phone'] },
         { fields: ['createdAt'] }
@@ -102,7 +115,11 @@ const User = db.define('fiaxit_users', {
     timestamps: true,
     paranoid: true,
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    tableName: 'fiaxit_users',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 });
 
 // Use { force: false, alter: true } for safer migrations in development

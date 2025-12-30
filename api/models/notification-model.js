@@ -3,9 +3,14 @@ const db = require('./db');
 
 const Notification = db.define('fiaxit_notifications', {
     id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    notification_id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
-        primaryKey: true
+        unique: true
     },
     user_id: {
         type: DataTypes.STRING(100),
@@ -46,7 +51,11 @@ const Notification = db.define('fiaxit_notifications', {
         { fields: ['user_id'] },
         { fields: ['is_read'] },
         { fields: ['createdAt'] }
-    ]
+    ],
+    tableName: 'fiaxit_notifications',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 });
 
 // Sync the model

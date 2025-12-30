@@ -2,6 +2,11 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('./db');
 
 const Coin = sequelize.define('fiaxit_coins', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     coin_id: {
         type: DataTypes.STRING(100),
         allowNull: false,
@@ -48,14 +53,17 @@ const Coin = sequelize.define('fiaxit_coins', {
     }
 }, {
     indexes: [
-        { fields: ['coin_id'] },
-        { fields: ['coin_symbol'] },
-        { fields: ['coin_status'] }
+        { fields: ['coin_status'] },
+        { fields: ['coin_type'] }
     ],
     timestamps: true,
     paranoid: true,
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    tableName: 'fiaxit_coins',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 });
 
 const syncOptions = process.env.NODE_ENV === 'development'

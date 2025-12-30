@@ -10,6 +10,7 @@ const { Op } = require('sequelize');
 const { timeStamp } = require('console');
 const UserKyc = require('../models/user-kyc-model');
 const emailHelper = require('../helpers/email-helper');
+const Notification = require('../models/notification-model');
 const fs = require('fs');
 const path = require('path');
 
@@ -666,10 +667,12 @@ class UsersController {
                 // const user = await User.findByPk(userId) // find by using primary key
                 if (user) {
                     user.user_fname = req.body.fname || user.user_fname
-                    user.user_mname = req.body.mname || null
+                    user.user_mname = req.body.mname || user.user_mname
                     user.user_lname = req.body.lname || user.user_lname
                     user.user_email = req.body.email || user.user_email
-                    user.user_phone = req.body.phone || null
+                    user.user_phone = req.body.phone || user.user_phone
+                    user.user_dob = req.body.dob || user.user_dob
+                    user.user_gender = req.body.gender || user.user_gender
                     user.user_image = req.body.user_image || user.user_image
                     if (req.body.password) {
                         user.updatePassword = true
@@ -734,7 +737,7 @@ class UsersController {
 
                 if (!email) {
                     return res.status(401).json({
-                        status: false,
+                        success: false,
                         method: 'userForgetPassword',
                         path: "email",
                         message: 'Missing required parameters: Email is required.'
@@ -749,9 +752,10 @@ class UsersController {
 
                 if (!user) {
                     return res.status(404).json({
-                        status: false,
+                        success: false,
                         method: "userForgetPassword",
-                        message: "Forget Password failed: User not found.",
+                        path: "email",
+                        message: "Forget Password failed: User email not found.",
                     })
                 }
                 // const code = this.generateVerificationCode();
@@ -766,20 +770,41 @@ class UsersController {
 
                 // Send verification code via email
                 const mailOptions = {
-                    from: "Fiaxit 👻" + process.env.EMAIL_USERNAME,
+                    from: `"Fiaxit Security" <${process.env.EMAIL_USERNAME}>`,
                     to: email,
-                    subject: 'Password Reset Verification Code.',
+                    subject: 'Password Reset Verification Code - Fiaxit',
                     html: `
-                        <h1>Password Reset Request</h1>
-                        <p>You requested a password reset. Please use the following verification code to reset your password:</p>
-                        <h2 style="background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 24px;">${verificationCode}</h2>
-                        <p>This code will expire in 15 minutes.</p>
-                        <p>If you didn't request a password reset, please ignore this email.</p>
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                <h2 style="margin-top: 0; color: #1a202c; font-size: 22px; text-align: center;">Reset Your Password</h2>
+                                <p style="font-size: 16px; color: #4a5568; text-align: center;">Hello, you requested a password reset for your Fiaxit account. Please use the verification code below to proceed:</p>
+                                
+                                <div style="background-color: #f8fafc; border-radius: 10px; padding: 30px; margin: 25px 0; border: 1px solid #edf2f7; text-align: center;">
+                                    <div style="font-size: 13px; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">Verification Code</div>
+                                    <div style="font-size: 36px; font-weight: 800; color: #0d6efd; letter-spacing: 8px;">${verificationCode}</div>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #64748b; text-align: center; margin-bottom: 0;">This code will expire in <strong>15 minutes</strong>.</p>
+                                
+                                <p style="font-size: 14px; color: #e53e3e; background-color: #fff5f5; padding: 12px; border-radius: 6px; border-left: 4px solid #f56565; margin-top: 25px;">
+                                    <strong>Security Notice:</strong> If you did not request this code, your account may be at risk. Please ignore this email and secure your account.
+                                </p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                                <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 0;">Thank you for choosing Fiaxit.</p>
+                            </div>
+                            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 12px;">
+                                &copy; ${new Date().getFullYear()} Fiaxit. All rights reserved.
+                            </div>
+                        </div>
                     `
                 }
 
                 // Send the email
-                await transporter.sendMail(mailOptions);
+                await emailHelper.sendMail(mailOptions);
 
                 // inset into forget password table
                 const insert = await UserForgetPassword.create({
@@ -842,7 +867,7 @@ class UsersController {
 
                 if (!storedData) {
                     return res.status(400).json({
-                        status: false,
+                        success: false,
                         method: "verifyResetCode",
                         message: 'Verify reset code failed: No verification code requested or code expired.'
                     });
@@ -852,7 +877,7 @@ class UsersController {
                 if (Date.now() > storedData.expiresAt) {
                     verificationCodes.delete(email);
                     return res.status(400).json({
-                        status: false,
+                        success: false,
                         method: "verifyResetCode",
                         message: 'Verify reset code failed: Verification code expired.'
                     });
@@ -861,7 +886,7 @@ class UsersController {
                 // Check if code matches
                 if (storedData.code !== code) {
                     return res.status(400).json({
-                        status: false,
+                        success: false,
                         method: "verifyResetCode",
                         message: 'Verify reset code failed: Invalid verification code.'
                     });
@@ -887,7 +912,7 @@ class UsersController {
                 verificationCodes.delete(email);
 
                 return res.status(200).json({
-                    status: false,
+                    success: true,
                     method: "verifyResetCode",
                     message: 'Code verified successfully',
                     data: {
@@ -898,7 +923,7 @@ class UsersController {
             } catch (error) {
                 console.error('Error in code verification:', error);
                 return res.status(500).json({
-                    status: false,
+                    success: false,
                     method: "verifyResetCode",
                     message: 'Verify reset code failed: Server error',
                     details: error.message
@@ -925,6 +950,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false,
                         method: "resetPassword",
+                        path: "confirmPassword",
                         message: "Passwords do not match."
                     });
                 }
@@ -935,6 +961,7 @@ class UsersController {
                     return res.status(422).json({
                         success: false,
                         method: "resetPassword",
+                        path: "newPassword",
                         message: "Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
                     });
                 }
@@ -953,6 +980,7 @@ class UsersController {
                     return res.status(400).json({
                         success: false,
                         method: "resetPassword",
+                        path: "resetToken",
                         message: "Invalid or expired reset token."
                     });
                 }
@@ -968,6 +996,7 @@ class UsersController {
                     return res.status(404).json({
                         success: false,
                         method: "resetPassword",
+                        path: "resetToken",
                         message: "User not found."
                     });
                 }
@@ -996,6 +1025,47 @@ class UsersController {
                         password_reset_user_id: resetRecord.password_reset_user_id,
                     }
                 });
+
+                // Create Notification
+                await Notification.create({
+                    user_id: user.user_id,
+                    title: 'Security Alert: Password Changed',
+                    message: 'Your account password was successfully reset. If this was not you, contact support immediately.',
+                    type: 'warning',
+                    link: '/settings/security'
+                });
+
+                // Send security email
+                const securityMailOptions = {
+                    from: `"Fiaxit Security" <${process.env.EMAIL_USERNAME}>`,
+                    to: user.user_email,
+                    subject: 'Security Alert: Your Password Was Reset',
+                    html: `
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                <h2 style="margin-top: 0; color: #1a202c; font-size: 22px; text-align: center;">Security Update</h2>
+                                <p style="font-size: 16px; color: #4a5568;">Hello ${user.user_fname},</p>
+                                <p style="font-size: 16px; color: #4a5568;">This is a confirmation that your Fiaxit account password has been successfully reset. </p>
+                                
+                                <div style="background-color: #f8fafc; border-radius: 10px; padding: 20px; margin: 25px 0; border: 1px solid #edf2f7; text-align: center;">
+                                    <p style="margin: 0; font-weight: 600; color: #2d3748;">Activity: Password Reset</p>
+                                    <p style="margin: 5px 0 0; font-size: 14px; color: #718096;">Date: ${new Date().toLocaleString()}</p>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #e53e3e; background-color: #fff5f5; padding: 12px; border-radius: 6px; border-left: 4px solid #f56565;">
+                                    <strong>Not you?</strong> If you did not perform this action, your account may have been compromised. Please contact our support team immediately.
+                                </p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                                <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 0;">Stay secure, <br> The Fiaxit Security Team</p>
+                            </div>
+                        </div>
+                    `
+                };
+                await emailHelper.sendMail(securityMailOptions).catch(err => console.error('Security alert email error:', err));
 
                 return res.status(200).json({
                     success: true,
@@ -1086,6 +1156,44 @@ class UsersController {
                 user.updatePassword = true;
                 await user.save();
 
+                // Create Notification
+                await Notification.create({
+                    user_id: user.user_id,
+                    title: 'Security Alert: Password Updated',
+                    message: 'Your account password was successfully changed from your profile settings.',
+                    type: 'info',
+                    link: '/settings/security'
+                });
+
+                // Send confirmation email
+                const changeMailOptions = {
+                    from: `"Fiaxit Security" <${process.env.EMAIL_USERNAME}>`,
+                    to: user.user_email,
+                    subject: 'Security Alert: Account Password Changed',
+                    html: `
+                        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6;">
+                            <div style="text-align: center; padding: 20px 0;">
+                                <h1 style="color: #0d6efd; margin: 0; font-size: 28px; letter-spacing: -1px;">Fiaxit</h1>
+                            </div>
+                            <div style="background-color: #ffffff; border-radius: 12px; padding: 35px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                <h2 style="margin-top: 0; color: #1a202c; font-size: 22px;">Password Changed</h2>
+                                <p style="font-size: 16px; color: #4a5568;">Hello ${user.user_fname}, your Fiaxit account password has been successfully updated.</p>
+                                
+                                <div style="background-color: #f8fafc; border-radius: 10px; padding: 20px; margin: 25px 0; border: 1px solid #edf2f7;">
+                                    <p style="margin: 0; font-size: 14px; color: #718096;">If you authorized this change, no further action is required.</p>
+                                </div>
+                                
+                                <p style="font-size: 14px; color: #e53e3e; background-color: #fff5f5; padding: 12px; border-radius: 6px; border-left: 4px solid #f56565;">
+                                    <strong>Security Notice:</strong> If you did not make this change, please recover your account or contact support immediately.
+                                </p>
+                                
+                                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                            </div>
+                        </div>
+                    `
+                };
+                await emailHelper.sendMail(changeMailOptions).catch(err => console.error('Change password alert email error:', err));
+
                 return res.status(200).json({
                     success: true,
                     message: "Password changed successfully."
@@ -1121,6 +1229,15 @@ class UsersController {
                 user.user_pin = new_pin;
                 user.updatePin = true;
                 await user.save();
+
+                // Create Notification
+                await Notification.create({
+                    user_id: user.user_id,
+                    title: 'Security Alert: Transaction PIN Updated',
+                    message: 'Your transaction PIN was successfully changed.',
+                    type: 'info',
+                    link: '/settings/security'
+                });
 
                 return res.status(200).json({
                     success: true,

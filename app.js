@@ -10,14 +10,15 @@ const tradeRoutes = require('./api/routes/trade');
 const coverterRoutes = require('./api/routes/convert');
 const coinRoutes = require('./api/routes/coins');
 const notificationRoutes = require('./api/routes/notifications');
+const adminRoutes = require('./api/routes/admin');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const { authenticate } = require('./api/middleware/check-auth');
 
 app.use(morgan('dev'));
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-app.use('/public', express.static('public'));
+app.use(bodyParser.urlencoded({ extended: false })); // For URL encoded form data
+app.use(bodyParser.json()); // For JSON data
+app.use('/public', express.static('public')); // For public files
 
 // CORS error handling
 app.use((req, res, next) => {
@@ -41,6 +42,7 @@ app.use('/v1/trade', authenticate, tradeRoutes);
 app.use('/v1/convert', coverterRoutes);
 app.use('/v1/coins', coinRoutes);
 app.use('/v1/notifications', authenticate, notificationRoutes);
+app.use('/v1/admin', adminRoutes);
 
 // Error handling
 app.use((req, res, next) => {

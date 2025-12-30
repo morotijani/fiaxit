@@ -1,7 +1,12 @@
 const { DataTypes } = require('sequelize');
 const db = require('./db');
 
-const Contact = db.define('Contact', {
+const Contact = db.define('fiaxit_contacts', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
     user_id: {
         type: DataTypes.STRING(100),
         allowNull: true
@@ -30,8 +35,16 @@ const Contact = db.define('Contact', {
 }, {
     indexes: [
         { fields: ['user_id'] }
-    ]
+    ],
+    tableName: 'fiaxit_contacts',
+    engine: 'InnoDB',
+    charset: 'utf8',
+    collate: 'utf8_general_ci',
 })
 
-Contact.sync();
+const syncOptions = process.env.NODE_ENV === 'development'
+    ? { alter: true }
+    : { force: false };
+
+Contact.sync(syncOptions);
 module.exports = Contact;
