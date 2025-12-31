@@ -13,6 +13,7 @@ const notificationRoutes = require('./api/routes/notifications');
 const adminRoutes = require('./api/routes/admin');
 const portfolioRoutes = require('./api/routes/portfolio');
 const priceAlertRoutes = require('./api/routes/price-alerts');
+const stakingRoutes = require('./api/routes/staking');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const { authenticate } = require('./api/middleware/check-auth');
@@ -47,6 +48,7 @@ app.use('/v1/notifications', authenticate, notificationRoutes);
 app.use('/v1/admin', adminRoutes);
 app.use('/v1/portfolio', portfolioRoutes);
 app.use('/v1/price-alerts', priceAlertRoutes);
+app.use('/v1/staking', stakingRoutes);
 
 // Error handling
 app.use((req, res, next) => {

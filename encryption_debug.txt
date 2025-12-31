@@ -136,3 +136,42 @@
 [2025-12-30T22:20:08.338Z] Trying Legacy Variation: Hashed Default Key...
 [2025-12-30T22:20:08.339Z] Legacy Hashed Default Key SUCCESS.
 [2025-12-30T22:27:13.843Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:26:50.419Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:28:12.487Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:29:10.294Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:30:06.577Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:30:18.895Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:31:22.787Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:32:25.892Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:37:12.597Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:39:42.042Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-30T23:42:24.742Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T00:02:37.296Z] Attempting Decrypt. IV length: 16. Encrypted length: 64.
+[2025-12-31T00:02:37.322Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T00:02:37.420Z] Primary decryption SUCCESS.
+[2025-12-31T00:33:23.714Z] Attempting Decrypt. IV length: 16. Encrypted length: 64.
+[2025-12-31T00:33:23.719Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T00:33:23.722Z] Primary decryption SUCCESS.
+[2025-12-31T00:39:14.544Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T00:47:55.543Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T00:51:36.564Z] Attempting Decrypt. IV length: 16. Encrypted length: 64.
+[2025-12-31T00:51:36.569Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T00:51:36.579Z] Primary decryption SUCCESS.
+[2025-12-31T01:46:53.261Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T02:00:01.369Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T02:01:48.133Z] Attempting Decrypt. IV length: 16. Encrypted length: 64.
+[2025-12-31T02:01:48.134Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T02:01:48.138Z] Primary decryption SUCCESS.
+[2025-12-31T02:24:24.668Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T02:25:10.725Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T02:27:35.380Z] Attempting Decrypt. IV length: 16. Encrypted length: 80.
+[2025-12-31T02:27:35.399Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T02:27:35.451Z] Primary decryption FAILED: error:1C800064:Provider routines::bad decrypt
+[2025-12-31T02:27:35.453Z] Trying Legacy Variation: Hashed Default Key...
+[2025-12-31T02:27:35.459Z] Legacy Hashed Default Key SUCCESS.
+[2025-12-31T02:33:15.713Z] Derived Key (from env/fallback). RawKey defined? true. Key length: 32
+[2025-12-31T02:34:27.785Z] Attempting Decrypt. IV length: 16. Encrypted length: 80.
+[2025-12-31T02:34:27.786Z] System RawKey status: DEFINED. Key prefix: eb94...
+[2025-12-31T02:34:27.787Z] Primary decryption FAILED: error:1C800064:Provider routines::bad decrypt
+[2025-12-31T02:34:27.788Z] Trying Legacy Variation: Hashed Default Key...
+[2025-12-31T02:34:27.788Z] Legacy Hashed Default Key SUCCESS.

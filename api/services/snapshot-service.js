@@ -20,7 +20,7 @@ class SnapshotService {
 
     async runSnapshots() {
         try {
-            const users = await User.findAll({ where: { user_status: 1 } });
+            const users = await User.findAll({ where: { user_verified: true } });
             console.log(`Starting snapshots for ${users.length} users...`);
 
             for (const user of users) {

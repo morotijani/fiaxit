@@ -578,6 +578,24 @@ class WalletsController {
                     totals[symbol]['fiat_equivalent'] = fiatEquivalent;
                 }
 
+                // --- ADDED: Include Internal Balances ---
+                const internalBalances = await UserBalance.findAll({ where: { user_id: userId } });
+                for (const ib of internalBalances) {
+                    const symbol = ib.coin_symbol;
+                    if (!totals[symbol]) {
+                        totals[symbol] = { amount: 0, name: symbol.toLowerCase(), fiat_equivalent: 0 };
+                    }
+                    const amount = parseFloat(ib.balance);
+                    totals[symbol].amount += amount;
+
+                    // Add to fiat total if symbol rate exists
+                    const COINGECKO_MAP = { eth: 'ethereum', btc: 'bitcoin', usdt: 'tether' };
+                    const rateId = COINGECKO_MAP[symbol.toLowerCase()] || symbol.toLowerCase();
+                    const rate = await getCryptoRate(rateId, 'usd');
+                    totals[symbol].fiat_equivalent += (amount * rate);
+                }
+
+
                 return res.status(200).json({
                     success: true,
                     method: "getTotalBalance",
@@ -596,6 +614,27 @@ class WalletsController {
         }
     }
 
+    // Get Internal Balances (Custodial)
+    getInternalBalances = () => {
+        return async (req, res) => {
+            try {
+                const userId = req.userData.user_id;
+                const balances = await UserBalance.findAll({ where: { user_id: userId } });
+                res.status(200).json({ success: true, data: balances });
+            } catch (err) {
+                res.status(500).json({ success: false, message: "Failed to fetch internal balances" });
+            }
+        };
+    }
+
+    // Deposit from non-custodial wallet to internal balance
+    depositToInternal = () => {
+        return async (req, res) => {
+            // This would involve a real transaction on-chain to our platform wallet
+            // For now, we'll mark it as a "processed" deposit for the user's manual simulation
+            res.status(200).json({ success: true, message: "Deposit feature initiated. Please send funds to our pool address." });
+        };
+    }
 }
 
 module.exports = new WalletsController()

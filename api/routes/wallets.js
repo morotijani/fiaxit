@@ -13,10 +13,10 @@ router.get('/:crypto/:address/info', WalletsController.getWalletInfo());
 
 /** ETH specific */
 // Usage (example): GET /api/v1/wallets/eth/:address/validate
-router.get('/eth/:address/validate', WalletsController.validateETHAddress); // validate eth address
+router.get('/eth/:address/validate', WalletsController.validateETHAddress);
 
-// get total balance
-router.get('/balance', WalletsController.getTotalBalance()); // get total balance of all wallets
+router.get('/total-balance', WalletsController.getTotalBalance());
+router.get('/internal-balances', WalletsController.getInternalBalances());
 
 // Usage (example): GET /api/v1/wallets
 router.get('/', WalletsController.getAll()) // get all wallet address

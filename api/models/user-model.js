@@ -102,6 +102,10 @@ const User = db.define('fiaxit_users', {
         type: DataTypes.ENUM('unverified', 'pending', 'verified', 'rejected'),
         defaultValue: 'unverified'
     },
+    kyc_tier: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0 // 0: Unverified, 1: Email, 2: ID Verified, 3: Proof of Address
+    },
     kyc_documents: {
         type: DataTypes.JSON,
         allowNull: true

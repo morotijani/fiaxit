@@ -193,7 +193,7 @@ class KYCController {
         return async (req, res, next) => {
             try {
                 const { userId } = req.params;
-                const { status, reason } = req.body;
+                const { status, reason, tier } = req.body;
 
                 if (!['verified', 'rejected'].includes(status)) {
                     return res.status(400).json({
@@ -219,6 +219,7 @@ class KYCController {
 
                 await user.update({
                     kyc_status: status,
+                    kyc_tier: status === 'verified' ? (tier || 2) : user.kyc_tier, // Use requested tier or default to 2
                     kyc_rejection_reason: status === 'rejected' ? reason : null
                 });
 

@@ -10,6 +10,9 @@ router.route('/')
 router.route('/export')
     .get(TransactionsController.exportCSV());
 
+router.route('/usage')
+    .get(TransactionsController.getDailyUsage());
+
 router.route('/:id')
     .get(TransactionsController.findById()) // get transaction by id
     .patch(TransactionsController.update()) // update transaction

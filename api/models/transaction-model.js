@@ -29,6 +29,10 @@ const Transaction = db.define('fiaxit_transactions', {
         type: DataTypes.DECIMAL(15, 8), // DECIMAL is better for financial data than DOUBLE
         allowNull: false
     },
+    transaction_amount_usd: {
+        type: DataTypes.DECIMAL(20, 2), // USD value at time of transaction
+        allowNull: true
+    },
     transaction_type: {
         type: DataTypes.ENUM('send', 'receive'),
         defaultValue: null,

@@ -245,6 +245,7 @@ class UsersController {
 
                 // update user data
                 user.user_verified = true
+                user.kyc_tier = 1 // Email verified Tier
                 const save = user.save({
                     where: {
                         user_id: uid
